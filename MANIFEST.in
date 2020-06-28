@@ -1,0 +1,10 @@
+recursive-include pter *.py *.html
+recursive-include tests *.py
+
+recursive-include extras *.conf
+recursive-include man *
+
+include CHANGELOG.md
+include LICENSE
+include README.md
+
