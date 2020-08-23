@@ -112,6 +112,14 @@ General
 
     See `Task Format`_ below for more details.
 
+  ``clear-contexts``
+    A list of comma separated contexts (without the leading ``@``) to remove from a task
+    when it is being marked as done.
+
+    For example, you might want to remove the ``@in`` context or any
+    ``@today`` tags when marking a task as done. In that case
+    ``clear-contexts`` should be set to ``in, today``.
+
   ``default-threshold``
     The default ``t:`` search value to use, even when no other search has
     been defined. Defaults to 'today'.
@@ -170,7 +178,9 @@ lists and the task list:
  - ``refresh-screen``: rebuild the GUI
  - ``reload-tasks``: enforce reloading of all tasks from all sources
  - ``save-search``: save the current search
- - ``zsearch``: enter a new search query
+ - ``search``: enter a new search query
+ - ``search-context``: select a context from the selected task and search for it
+ - ``search-project``: select a project from the selected task and search for it
  - ``show-help``: show the full screen help (only key bindings so far)
  - ``open-manual``: open this manual in a browser
  - ``toggle-done``: toggle the "done" state of a task
@@ -230,18 +240,18 @@ color. Some color's names come with a ``sel-`` prefix so you can define the
 color when it is a selected list item.
 
 You may decide to only define one value, which will then be used as the text
-color. The background color will then be taken from ``normal`` or ``selected``
+color. The background color will then be taken from ``normal`` or ``sel-normal``
 respectively.
 
 If you do not define the ``sel-`` version of a color, pter will use the
-normal version and put the ``selected`` background to it.
+normal version and put the ``sel-normal`` background to it.
 
 If you specify a special background for the normal version, but none for the
 selected version, the special background of the normal version will be used
 for the selected version, too!
 
  - ``normal``, any normal text and borders
- - ``selected``, selected items in a list
+ - ``sel-normal``, selected items in a list
  - ``error``, error messages
  - ``sel-overflow``, ``overflow``, color for the scrolling indicators when editing tasks (and when selected)
  - ``sel-overdue``, ``overdue``, color for a task when it’s due date is in the past (and when selected)
@@ -262,7 +272,7 @@ colors like this::
 
   [Colors]
   normal = 2, 1
-  selected = 1, 2
+  sel-normal = 1, 2
   context = 4
 
 
@@ -373,6 +383,8 @@ In the list of tasks, the following controls are also available:
  - "e": edit the currently selected task
  - "n": create a new task
  - "/": edit the search query
+ - "c": search for a context of the currently selected task
+ - "p": search for a project of the currently selected task
  - "q": quit the program
  - "l": load a named search
  - "s": save the current search

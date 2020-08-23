@@ -254,6 +254,8 @@ class Window:
                             'n': 'create-task',
                             ':': 'jump-to',
                             '/': 'search',
+                            'c': 'search-context',
+                            'p': 'search-project',
                             't': 'toggle-tracking',
                             '^L': 'refresh-screen',
                             '^R': 'reload-tasks',
@@ -287,6 +289,8 @@ class Window:
         self.use_colors = conf.bool('General', 'use-colors', 'y')
         self.human_friendly_dates = conf.list('General', 'human-friendly-dates', '')
         self.task_format = parse_task_format(conf.get('General', 'task-format', DEFAULT_TASK_FORMAT))
+        self.clear_contexts = [context for context in conf.list('General', 'clear-contexts', '')
+                               if len(context) > 0]
 
         # mapable functions
         self.functions = {'quit': self.do_quit,
@@ -298,6 +302,8 @@ class Window:
                           'refresh-screen': self.do_refresh_screen,
                           'reload-tasks': self.do_reload_tasks,
                           'search': self.do_start_search,
+                          'search-context': self.do_search_context,
+                          'search-project': self.do_search_project,
                           'load-search': self.do_load_search,
                           'save-search': self.do_save_search,
                           'first-item': self.do_go_first_task,
@@ -322,6 +328,8 @@ class Window:
                            'open-url': 'Open URL',
                            'load-search': 'Load search',
                            'save-search': 'Save search',
+                           'search-context': 'Search for context of this task',
+                           'search-project': 'Search for project of this task',
                            'first-item': 'First item',
                            'last-item': 'Last item',
                            'edit-task': 'Edit task',
@@ -1146,13 +1154,57 @@ class Window:
     def do_start_search(self):
         self.read_search_input()
 
+    def do_search_context(self):
+        if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
+            return
+        task, source = self.filtered_tasks[self.selected_task]
+        contexts = [context for context in task.contexts if context not in self.search.contexts]
+
+        if len(contexts) == 0:
+            return
+
+        contexts.sort()
+        context = self.select_one(contexts, "Select context")
+
+        if context is not None:
+            context = '@' + context
+            if len(self.search.text) > 0:
+                context = " " + context
+            self.search.text += context
+            self.search.parse()
+            self.apply_search()
+            self.show_tasks()
+            self.refresh_search_bar()
+
+    def do_search_project(self):
+        if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
+            return
+        task, source = self.filtered_tasks[self.selected_task]
+        projects = [project for project in task.projects if project not in self.search.projects]
+
+        if len(projects) == 0:
+            return
+
+        projects.sort()
+        project = self.select_one(projects, "Select project")
+
+        if project is not None:
+            project = '+' + project
+            if len(self.search.text) > 0:
+                project = " " + project
+            self.search.text += project
+            self.search.parse()
+            self.apply_search()
+            self.show_tasks()
+            self.refresh_search_bar()
+
     def do_toggle_done(self):
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
         task, source = self.filtered_tasks[self.selected_task]
         task = ensure_up_to_date(source, task)
         if task is not None:
-            toggle_done(task)
+            self.toggle_done(task)
             source.save(safe=self.safe_save)
         else:
             self.status_bar.addstr(0, 0, "Not changed: task was modified in the background", self.color(Window.ERROR))
@@ -1213,7 +1265,8 @@ class Window:
         if source.refresh():
             source.parse()
             self.update_tasks()
-            these = [other for other in source.tasks if other.raw.strip() == task.raw.strip()]
+            raw = str(task).strip()
+            these = [other for other in source.tasks if str(other).strip() == raw]
             if len(these) > 0:
                 task = these[0]
             else:
@@ -1221,12 +1274,12 @@ class Window:
                 self.status_bar.addstr(0, 0, "Cannot edit: task was modified in the background", self.color(Window.ERROR))
                 self.status_bar.noutrefresh()
                 return
-        text = self.read_text(y+1, 4, curses.COLS-8, task.raw.strip())
+        text = self.read_text(y+1, 4, curses.COLS-8, str(task).strip())
         if text is not None:
             text = dehumanize_dates(text)
         frame.erase()
         del frame
-        if text is not None and text.strip() != task.raw.strip():
+        if text is not None and text.strip() != str(task).strip():
             task = ensure_up_to_date(source, task)
             if task is not None:
                 task.parse(text)
@@ -1339,7 +1392,7 @@ class Window:
                     'first-item', 'last-item', 'jump-to']
         edt_fncs = ['toggle-hidden', 'toggle-done', 'edit-task', 'create-task',
                     'toggle-tracking']
-        search_fncs = ['search', 'load-search', 'save-search']
+        search_fncs = ['search', 'load-search', 'save-search', 'search-context', 'search-project']
         meta_fncs = ['show-help', 'open-manual', 'quit', 'cancel', 'refresh-screen',
                      'reload-tasks']
         other_fncs = ['open-url']
@@ -1433,19 +1486,24 @@ class Window:
         self.do_refresh_screen()
 
 
-def toggle_done(task):
-    task.is_completed = not task.is_completed
-    if task.is_completed:
-        task.completion_date = datetime.datetime.now().date()
-        if task.priority is not None:
-            task.add_attribute('pri', task.priority)
-            task.priority = None
-    else:
-        task.completion_date = None
-        attrs = task.attributes
-        if 'pri' in attrs:
-            task.priority = attrs['pri'][0]
-            task.remove_attribute('pri')
+    def toggle_done(self, task):
+        task.is_completed = not task.is_completed
+        if task.is_completed:
+            task.completion_date = datetime.datetime.now().date()
+            if task.priority is not None:
+                task.add_attribute('pri', task.priority)
+                task.priority = None
+            if len(self.clear_contexts) > 0:
+                for context in self.clear_contexts:
+                    while f'@{context}' in task.description:
+                        task.remove_context(context)
+        else:
+            task.completion_date = None
+            attrs = task.attributes
+            if 'pri' in attrs:
+                task.priority = attrs['pri'][0]
+                task.remove_attribute('pri')
+        task.raw = str(task)
 
 
 def toggle_hidden(task):
@@ -1457,6 +1515,7 @@ def toggle_hidden(task):
             task.add_attribute('h', '1')
     else:
         task.add_attribute('h', '1')
+    task.raw = str(task)
 
 
 def parse_searches():

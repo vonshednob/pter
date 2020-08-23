@@ -5,6 +5,14 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.1
+### Addad
+- `clear-contexts` configuration option
+- New `search-project` and `search-context` functions on keys `p` and `c` respectively
+
+### Fixed
+- Editing a task after marking it as done, keeps it marked as done ([#24](https://git.spacepanda.se/bold-kitty/pter/issues/24))
+
 ## 1.0.0
 ### Added
 - Read the manual in a browser (`open-manual` function and `m` shortcut)
