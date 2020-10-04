@@ -5,8 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.2
+### Added
+- Delegate functionality
+
+### Bugfix
+- Fixed a crash when a task consists only of a date (issue [#25](https://git.spacepanda.se/bold-kitty/pter/issues/25))
+
 ## 1.0.1
-### Addad
+### Added
 - `clear-contexts` configuration option
 - New `search-project` and `search-context` functions on keys `p` and `c` respectively
 

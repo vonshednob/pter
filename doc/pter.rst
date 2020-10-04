@@ -126,6 +126,22 @@ General
 
     This option supports `Relative Dates`_.
 
+  ``delegation-marker``
+    Marker to add to a task when delegating it. Defaults to ``@delegated``.
+
+  ``delegation-action``
+    Action to take when delegating a task.
+    One of 'none', or 'mail-to' (defaulting to 'mail-to').
+
+    'none' does nothing, but 'mail-to' will attempt to start your email
+    program to write an email. If your task has a 'to:' attribute, it will
+    be used as the recipient for the email.
+
+  ``delegation-to``
+    Attribute name to use when delegating a task via email. Defaults to
+    ``to``. Eg. "clean the dishes to:bob" will compose the email to "bob"
+    when delegating a task and the delegation action is "mail-to".
+
 
 Symbols
 -------
@@ -186,6 +202,7 @@ lists and the task list:
  - ``toggle-done``: toggle the "done" state of a task
  - ``toggle-hidden``: toggle the "hidden" state of a task
  - ``toggle-tracking``: start or stop time tracking for the selected task
+ - ``delegate``: delegate a task
 
 And the second list of functions for edit fields:
 
@@ -390,6 +407,7 @@ In the list of tasks, the following controls are also available:
  - "s": save the current search
  - "u": open a URL listed in the selected task
  - "t": Start/stop time tracking of the selected task
+ - ">": Delegate the selected task
 
 In edit fields the following keyboard controls are available:
 
@@ -621,6 +639,22 @@ accumulate accordingly. The smallest amount of time tracked is one minute.
 
 This feature is non-standard for todo.txt but compatible with every other
 implementation.
+
+
+Delegating Tasks
+================
+
+The ``delegate`` function (on shortcut ``>`` by default) can be used to
+mark a task as delegated and trigger the delegation action.
+
+When delegating a task the configured marker is being added to the task
+(configured by ``delegation-marker`` in the configuration file).
+
+The delegation action is configured by setting the ``delegation-action`` in
+the configuration file to ``mail-to``. In that case an attempt is made to
+open your email program and start a new email. In case you defined a
+``to:`` (configurable by defining ``delegation-to``) in your task
+description, that will be used as the recipient for the email.
 
 
 Getting Things Done

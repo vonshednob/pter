@@ -9,6 +9,7 @@ import datetime
 import configparser
 import string
 import webbrowser
+import urllib.parse
 
 try:
     from xdg import BaseDirectory
@@ -38,6 +39,10 @@ SEARCHES_FILE = CONFIGDIR / "searches.txt"
 
 URL_RE = re.compile(r'([A-Za-z][A-Za-z0-9+\-.]*)://([^ ]+)')
 
+DELEGATE_ACTION_NONE = 'none'
+DELEGATE_ACTION_MAIL = 'mail-to'
+DELEGATE_ACTIONS = (DELEGATE_ACTION_NONE, DELEGATE_ACTION_MAIL)
+
 TF_SELECTION = 'selection'
 TF_NUMBER = 'nr'
 TF_DESCRIPTION = 'description'
@@ -59,6 +64,7 @@ DEFAULT_CONFIG = {
             'safe-save': 'yes',
             'search-case-sensitive': 'yes',
             'human-friendly-dates': '',
+            'delegation-text': '@delegated',
         },
         'Symbols': {
         },
@@ -260,6 +266,7 @@ class Window:
                             '^L': 'refresh-screen',
                             '^R': 'reload-tasks',
                             'u': 'open-url',
+                            '>': 'delegate',
                             'l': 'load-search',
                             's': 'save-search',
                             '?': 'show-help',
@@ -316,6 +323,7 @@ class Window:
                           'toggle-done': self.do_toggle_done,
                           'toggle-hidden': self.do_toggle_hidden,
                           'show-help': self.do_show_help,
+                          'delegate': self.do_delegate,
                           'open-manual': self.do_open_manual,}
         self.short_name = {'quit': 'Quit',
                            'cancel': 'Cancel',
@@ -348,6 +356,7 @@ class Window:
                            'del-right': 'Delete to the right',
                            'del-to-bol': 'Delete to start of line',
                            'submit-input': 'Apply changes',
+                           'delegate': 'Delegate task',
                            }
 
         curses.start_color()
@@ -381,6 +390,15 @@ class Window:
                                               'search-case-sensitive', 'y'),
                                self.conf.get('General',
                                              'default-threshold', None))
+        self.delegation_marker = self.conf.get('General',
+                                               'delegation-marker', '@delegated')
+        self.delegation_action = self.conf.get('General',
+                                               'delegation-action',
+                                               DELEGATE_ACTION_NONE).lower()
+        self.delegate_to = self.conf.get('General',
+                                         'delegation-to', 'to').lower()
+        if self.delegation_action not in DELEGATE_ACTIONS:
+            self.delegation_action = DELEGATE_ACTION_NONE
 
         for item in self.conf['Keys']:
             fnc = self.conf.get('Keys', item, None)
@@ -692,32 +710,33 @@ class Window:
 
             # Description
             description = TaskLineDescription()
-            for word in task.description.split(' '):
-                if len(word) == 0:
-                    continue
+            if task.description is not None:
+                for word in task.description.split(' '):
+                    if len(word) == 0:
+                        continue
 
-                attr = None
+                    attr = None
 
-                if word.startswith('@'):
-                    attr = Window.CONTEXT
-                elif word.startswith('+'):
-                    attr = Window.PROJECT
-                elif ':' in word:
-                    key, value = word.split(':', 1)
-                    if 'hl:' + key in self.colors:
-                        attr = 'hl:' + key
-                    if key in ['t', 'due']:
-                        word = key + ':' + self.date_as_str(value, key)
-                    if key == 'pri':
-                        attr = None
-                        value = value.upper()
-                        if value == 'A':
-                            attr = Window.PRI_A
-                        elif value == 'B':
-                            attr = Window.PRI_B
-                        elif value == 'C':
-                            attr = Window.PRI_C
-                description.append(word, attr, space_around=True)
+                    if word.startswith('@'):
+                        attr = Window.CONTEXT
+                    elif word.startswith('+'):
+                        attr = Window.PROJECT
+                    elif ':' in word:
+                        key, value = word.split(':', 1)
+                        if 'hl:' + key in self.colors:
+                            attr = 'hl:' + key
+                        if key in ['t', 'due']:
+                            word = key + ':' + self.date_as_str(value, key)
+                        if key == 'pri':
+                            attr = None
+                            value = value.upper()
+                            if value == 'A':
+                                attr = Window.PRI_A
+                            elif value == 'B':
+                                attr = Window.PRI_B
+                            elif value == 'C':
+                                attr = Window.PRI_C
+                    description.append(word, attr, space_around=True)
             line.elements[TF_DESCRIPTION] = description
             update_max_width(TF_DESCRIPTION, ' '.join([e.content for e in description.elements]))
 
@@ -1357,6 +1376,9 @@ class Window:
         task, _ = self.filtered_tasks[self.selected_task]
         urls = []
 
+        if task.description is None:
+            return
+
         for match in URL_RE.finditer(task.description):
             if match.group(1) not in protos:
                 continue
@@ -1375,6 +1397,53 @@ class Window:
         if url is not None:
             webbrowser.open(url)
 
+    def do_delegate(self):
+        if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
+            return
+
+        task, source = self.filtered_tasks[self.selected_task]
+
+        if len(self.delegation_marker) == 0:
+            # no delegation marker
+            return
+
+        if task.description is None:
+            task.description = ''
+
+        if self.delegation_marker in task.description.split(' '):
+            # already delegated
+            self.do_delegation_action(task)
+            return
+        
+        task = ensure_up_to_date(source, task)
+        if task is not None:
+            task.description += ' ' + self.delegation_marker.strip()
+            source.save(safe=self.safe_save)
+            self.do_delegation_action(task)
+        else:
+            self.status_bar.addstr(0, 0, "Not delegated: task was modified in the background", self.color(Window.ERROR))
+            self.status_bar.noutrefresh()
+        self.update_tasks()
+
+    def do_delegation_action(self, task):
+        if self.delegation_action == DELEGATE_ACTION_NONE:
+            return
+
+        recipient = ''
+        to_attr = self.delegate_to
+        attrs = task.attributes
+        if len(to_attr) > 0 and to_attr in attrs:
+            recipient = ','.join(attrs[to_attr])
+
+        if self.delegation_action == DELEGATE_ACTION_MAIL:
+            # filter out to: (to_attr) and the delegation marker
+            text = ' '.join([word for word in str(task).split(' ')
+                             if word != self.delegation_marker
+                                and (len(to_attr) == 0
+                                     or not word.startswith(to_attr + ':'))])
+            uri = 'mailto:' + recipient + '?Subject=' + urllib.parse.quote(text)
+            webbrowser.open(uri)
+
     @staticmethod
     def do_open_manual():
         docloc = HERE / "docs" / "pter.html"
@@ -1391,7 +1460,7 @@ class Window:
         nav_fncs = ['next-item', 'prev-item', 'half-page-up', 'half-page-down',
                     'first-item', 'last-item', 'jump-to']
         edt_fncs = ['toggle-hidden', 'toggle-done', 'edit-task', 'create-task',
-                    'toggle-tracking']
+                    'toggle-tracking', 'delegate']
         search_fncs = ['search', 'load-search', 'save-search', 'search-context', 'search-project']
         meta_fncs = ['show-help', 'open-manual', 'quit', 'cancel', 'refresh-screen',
                      'reload-tasks']
@@ -1493,7 +1562,7 @@ class Window:
             if task.priority is not None:
                 task.add_attribute('pri', task.priority)
                 task.priority = None
-            if len(self.clear_contexts) > 0:
+            if len(self.clear_contexts) > 0 and task.description is not None:
                 for context in self.clear_contexts:
                     while f'@{context}' in task.description:
                         task.remove_context(context)
