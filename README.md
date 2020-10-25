@@ -1,6 +1,6 @@
 # pter
 
-Your console UI to manage your todo.txt file(s).
+Your console and graphical UI to manage your todo.txt file(s).
 
 ![](doc/pter-demo.gif)
 
@@ -13,6 +13,8 @@ pter has a bunch of features that help you managing your todo.txt file:
  - Configurable behaviour, shortcuts, and colors
  - Time tracking
 
+There is also a graphical user interface called qpter.
+
 
 ## Installation
 
@@ -22,6 +24,10 @@ To install pter you can either clone the repository (see at the end) or, much
 simpler, use pip to install it:
 
     pip install pter
+
+If you want to use the Qt GUI qpter, you have to install PyQt5::
+
+    pip install PyQt5
 
 
 ### Clone from github
@@ -66,4 +72,12 @@ There is a complex search available (have a look at the manual for details), but
  - search for a project with `+project`
  - search for tasks that do not belong to a context with `-@context` or `not:@context`
  - press `Return` to return the focus to the task list
+
+
+## Using qpter
+
+To launch the Qt GUI, you may (but don’t have to) provide the location of your
+todo.txt file::
+
+    qpter ~/todo.txt
 

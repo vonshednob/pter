@@ -1,8 +1,11 @@
 import datetime
 import string
 import re
+import webbrowser
+import urllib.parse
 
 from pter.searcher import get_relative_date
+from pter import common
 from pytodotxt import Task
 
 
@@ -65,6 +68,17 @@ def parse_duration(text):
     return duration
 
 
+def task_due_in_days(task):
+    if len(task.attr_due) == 0:
+        return None
+    today = datetime.datetime.now().date()
+    try:
+        then = datetime.datetime.strptime(task.attr_due[0], Task.DATE_FMT).date()
+        return (then - today).days
+    except ValueError:
+        return None
+
+
 def dehumanize_dates(text, tags=None):
     """Replace occurrences of relative dates in tags"""
     if tags is None:
@@ -93,11 +107,11 @@ def dehumanize_dates(text, tags=None):
     return text
 
 
-def ensure_up_to_date(source, task):
+def ensure_up_to_date(task):
     ok = True
-    if source.refresh():
+    if task.todotxt.refresh():
         ok = False
-        source.parse()
+        task.todotxt.parse()
         tasks = [other for other in source.tasks if other.raw.strip() == task.raw.strip()]
         if len(tasks) > 0:
             ok = True
@@ -116,13 +130,68 @@ def toggle_tracking(task):
     return True
 
 
-def update_spent(task):
-    attrs = task.attributes
-    now = datetime.datetime.now()
-    tracking = attrs.get('tracking', None)
-    raw_spent = attrs.get('spent', None)
+def toggle_done(task, clear_contexts):
+    task.is_completed = not task.is_completed
+    if task.is_completed:
+        task.completion_date = datetime.datetime.now().date()
+        if task.priority is not None:
+            task.add_attribute('pri', task.priority)
+            task.priority = None
+        if len(clear_contexts) > 0 and task.description is not None:
+            for context in clear_contexts:
+                while f'@{context}' in task.description:
+                    task.remove_context(context)
+    else:
+        task.completion_date = None
+        attrs = task.attributes
+        if 'pri' in attrs:
+            task.priority = attrs['pri'][0]
+            task.remove_attribute('pri')
+    task.raw = str(task)
 
-    if tracking is None:
+
+def toggle_hidden(task):
+    is_hidden = len(task.attr_h) > 0 and task.attr_h[0] == '1'
+    if len(task.attr_h) > 0:
+        is_hidden = task.attr_h[0] == '1'
+        task.remove_attribute('h', '1')
+        if not is_hidden:
+            task.add_attribute('h', '1')
+    else:
+        task.add_attribute('h', '1')
+
+
+def sign(n):
+    if n < 0:
+        return -1
+    elif n > 0:
+        return 1
+    return 0
+
+
+def sort_fnc(a):
+    if isinstance(a, tuple):
+        task, _ = a
+    else:
+        task = a
+    daydiff = task_due_in_days(task)
+    if daydiff is None:
+        daydiff = 2
+    else:
+        daydiff = sign(daydiff)
+    prio = task.priority
+    if prio is None:
+        prio = 'ZZZ'
+    tracking = len(task.attr_tracking) > 0
+    return [task.is_completed, daydiff, prio, task.linenr]
+
+
+def update_spent(task):
+    now = datetime.datetime.now()
+    tracking = task.attr_tracking
+    raw_spent = task.attr_spent
+
+    if len(tracking) == 0:
         return False
 
     try:
@@ -130,7 +199,7 @@ def update_spent(task):
     except ValueError:
         return False
 
-    if raw_spent is not None:
+    if len(raw_spent) > 0:
         spent = parse_duration(raw_spent[0])
         if spent is None:
             self.status_bar.addstr(0, 0, "Failed to parse 'spent' time", self.color(Window.ERROR))
@@ -148,7 +217,7 @@ def update_spent(task):
     # TODO: make the minimal duration configurable
     if diff >= datetime.timedelta(minutes=1):
         spent = duration_as_str(spent + diff)
-        if raw_spent is None:
+        if len(raw_spent) == 0:
             task.add_attribute('spent', spent)
         else:
             task.replace_attribute('spent', raw_spent[0], spent)
@@ -259,4 +328,70 @@ def parse_task_format(text):
             tokens.append(token)
 
     return tokens
+
+
+def unquote(text):
+    if len(text) <= 1:
+        return text
+    if text[0] in '"\'' and text[0] == text[-1]:
+        return text[1:-1]
+    return text
+
+
+def open_manual():
+    docloc = common.HERE / "docs" / "pter.html"
+
+    if docloc.exists():
+        webbrowser.open('file://' + str(docloc))
+
+
+def parse_searches():
+    if not common.SEARCHES_FILE.exists():
+        return {}
+
+    searches = {}
+    with open(common.SEARCHES_FILE, 'rt', encoding="utf-8") as fd:
+        for linenr, line in enumerate(fd.readlines()):
+            if '=' not in line:
+                continue
+            name, searchdef = line.split("=", 1)
+            name = name.strip()
+            searchdef = searchdef.strip()
+            if len(name) == 0 or len(searchdef) == 0:
+                continue
+            searches[name.strip()] = searchdef.strip()
+
+    return searches
+
+
+def save_searches(searches):
+    with open(common.SEARCHES_FILE, 'wt', encoding="utf-8") as fd:
+        for name in sorted(searches.keys()):
+            value = searches[name].strip()
+            if len(value) == 0:
+                continue
+            fd.write(f"{name} = {value}\n")
+
+
+def update_displaynames(sources):
+    # TODO: produce minimal, but unique names based on the filename
+    pass
+
+
+def execute_delegate_action(task, to_attr, marker, action):
+    if action == common.DELEGATE_ACTION_NONE:
+        return
+
+    recipient = ''
+    if len(to_attr) > 0 and to_attr in task.attributes:
+        recipient = ','.join(task.attributes[to_attr])
+
+    if action == common.DELEGATE_ACTION_MAIL:
+        # filter out "to:" (to_attr) and the delegation marker
+        text = ' '.join([word for word in str(task).split(' ')
+                         if word != marker
+                            and (len(to_attr) == 0
+                                 or not word.startswith(to_attr + ':'))])
+        uri = 'mailto:' + urllib.parse.quote(recipient) + '?Subject=' + urllib.parse.quote(text)
+        webbrowser.open(uri)
 

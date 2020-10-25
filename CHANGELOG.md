@@ -5,6 +5,29 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.4
+### Added
+- Default colors for project and context in qpter
+
+### Changed
+- qpter is always installed, but will not start without PyQt5
+
+### Fixed
+- Bugfix: Starting qpter for the first time fails with ValueError exception
+- Bugfix: Mixed up GUI:Highlight and GUI:Colors
+
+## 1.0.3
+### Changed
+- Depend on pytodotxt 1.0.3
+
+### Added
+- Configurable protocols for URLs to open with 'u'
+- Configuration option "add-creation-date", whether date should be added automatically to a task upon creation
+- GUI version using Qt5
+- GUI:Colors configuration group
+- GUI:Highlight configuration group
+- add-creation-date configuration option in General
+
 ## 1.0.2
 ### Added
 - Delegate functionality

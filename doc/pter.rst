@@ -11,6 +11,7 @@ Synopsis
 ::
 
   pter [-h] [-c configuration] filename [filename ...]
+  qpter [-h] [-c configuration] filename [filename ...]
 
 
 Description
@@ -29,6 +30,10 @@ pter offers these features:
  - Configurable behaviour, shortcuts, and colors (see `Files`_)
  - Time tracking
 
+qpter is the Qt version of pter (ie. pter with a graphical user interface)
+and supports mostly the same features but sometimes looks for other
+sections in the configuration.
+
 
 Options
 =======
@@ -44,6 +49,7 @@ Options
   ``filename``
     Path to your todo.txt file. The first file that you provide is the one
     where new tasks will be created in.
+
 
 Files
 =====
@@ -66,7 +72,9 @@ The configuration file has four sections (the names are case-sensitive):
  - `Keys`_, to override default keyboard controls in lists,
  - Editor:Keys, to override the default keyboard controls in edit fields (detailed in `Keys`_),
  - `Colors`_, for coloring the TUI,
- - `Highlight`_, for coloring specific tags of tasks.
+ - `GUI:Colors`_, for coloring the tasks in the GUI,
+ - `Highlight`_, for coloring specific tags of tasks,
+ - GUI:Highlight, for coloring specific tags of tasks (GUI version, see `Highlight`_).
 
 General
 -------
@@ -134,13 +142,22 @@ General
     One of 'none', or 'mail-to' (defaulting to 'mail-to').
 
     'none' does nothing, but 'mail-to' will attempt to start your email
-    program to write an email. If your task has a 'to:' attribute, it will
-    be used as the recipient for the email.
+    program to write an email. If your task has a 'to:' attribute (or
+    whatever you set up for ``delegation-to``, it will be used as the
+    recipient for the email.
 
   ``delegation-to``
     Attribute name to use when delegating a task via email. Defaults to
     ``to``. Eg. "clean the dishes to:bob" will compose the email to "bob"
     when delegating a task and the delegation action is "mail-to".
+
+  ``protocols``
+    What protocols should be considered when using the 'Open URL' function
+    on a task. Defaults to ``http, https, mailto, ftp, ftps``.
+
+  ``add-creation-date``
+    Whether or not to automatically always add the creation date of a task
+    to it when creating the task. Defaults to ``yes``.
 
 
 Symbols
@@ -173,7 +190,10 @@ Keys
 ----
 
 In the configuration file you can assign keyboard shortcuts to the various
-functions in pter.
+functions in pter and qpter.
+
+For details on how to setup shortcuts for qpter, please see below in
+section `GUI Keys`_.
 
 There are two main distinct groups of functions. The first, for general
 lists and the task list:
@@ -249,6 +269,34 @@ An example could look like this::
   C = create-task
 
 
+GUI Keys
+~~~~~~~~
+
+To assign shortcuts to functions in the Qt GUI, you will have to use the Qt
+style key names, see `https://doc.qt.io/qt-5/qkeysequence.html#details`_ .
+
+The assignment is done in the group ``GUI:Keys``, like this::
+
+  [GUI:Keys]
+  new = Ctrl+N
+  toggle-done = Ctrl+D
+
+Available function names are:
+
+ - ``quit``, quit qpter
+ - ``open-manual``, open this manual
+ - ``open-file``, open an additional todo.txt,
+ - ``new``, open the editor to create a new task,
+ - ``edit``, opens the editor for the selected task,
+ - ``toggle-done``, toggles the completion of a task,
+ - ``toggle-tracking``, toggle the 'tracking' attribute of the selected task,
+ - ``toggle-hidden``, toggle the 'hidden' attribute of the selected task,
+ - ``search``, opens and focuses the search field,
+ - ``named-searches``, opens and focuses the list of named searches,
+ - ``focus-tasks``, focuses the task list,
+ - ``delegate``, delegate the selected task
+
+
 Colors
 ------
 
@@ -293,6 +341,24 @@ colors like this::
   context = 4
 
 
+GUI:Colors
+----------
+
+The GUI has a somewhat different coloring scheme. The available colors are:
+
+ - ``normal``, any regular text in the description of a task,
+ - ``done``, color for tasks that are done,
+ - ``overdue``, text color for overdue tasks,
+ - ``due-today``, color for tasks that are due today,
+ - ``due-tomorrow``, color for tasks that are due tomorrow,
+ - ``project``, color for projects,
+ - ``context``, color for contexts,
+ - ``tracking``, color for tasks that are currently being tracked,
+ - ``pri-a``, color for the priority A,
+ - ``pri-b``, color for the priority b,
+ - ``pri-c``, color for the priority c
+
+
 Highlight
 ---------
 
@@ -305,16 +371,27 @@ this::
   [Highlight]
   due = 8, 0
 
+For the GUI, use ``GUI:Highlight``. The colors can be specific as hex
+values (3, or 6-digits) or named::
+
+  [GUI:Highlight]
+  due = red
+  t = #4ee
+  to = #03fe4b
+
 
 Task Format
 -----------
 
 The task formatting is a mechanism that allows you to configure how tasks are
-being displayed. It uses placeholders for elements of a task that you can
+being displayed in pter. It uses placeholders for elements of a task that you can
 order and align using a mini language similar to `Python’s format
 specification
 mini-language <https://docs.python.org/library/string.html#formatspec>`_, but
-much less complete. Let’s go by example.
+much less complete.
+
+qpter uses only part of the definition, see below in the list of field
+names, if you only care for qpter.
 
 If you want to show the task’s age and description, this is your
 task format::
@@ -361,6 +438,14 @@ be shown if the field is missing::
 Now there will be an emoji next to the completion date, or none if the task has
 no completion date.
 
+All that being said, qpter uses the same ``task-format`` configuration
+option to show tasks, but will disregard some fields (see below) and only
+use the field names, but not alignment or decorations.
+
+
+Field Names
+~~~~~~~~~~~
+
 The following fields exist:
 
  - ``description``, the full description text of the task
@@ -371,8 +456,8 @@ The following fields exist:
  - ``pri``, the character for the priority (might not be defined)
  - ``due``, the symbol for the due status (overdue, due today, due tomorrow; might not be defined)
  - ``duedays``, in how many days a task is due (negative number when overdue tasks)
- - ``selection``, the symbol that’s shown when this task is selected in the list
- - ``nr``, the number of the task in the list
+ - ``selection``, the symbol that’s shown when this task is selected in the list (disregarded in qpter)
+ - ``nr``, the number of the task in the list (disregarded in qpter)
  - ``tracking``, the symbol to indicate that you started time tracking of this task (might not be there)
 
 ``description`` is potentially consuming the whole line, so you might want to
@@ -382,6 +467,12 @@ put it last in your ``task-format``.
 
 Keyboard controls
 =================
+
+pter and qpter have different keyboard shortcuts.
+
+
+pter
+-----
 
 These default keyboard controls are available in any list:
 
@@ -419,6 +510,21 @@ In edit fields the following keyboard controls are available:
  - "^U": delete from before the cursor to the start of the line
  - "Escape", "^C": cancel editing
  - "Enter", "Return": accept input and submit changes
+
+
+qpter
+------
+
+ - Quit: ``Ctrl+Q``
+ - Open the manual: ``F1``
+ - Focus the task list: ``F6``
+ - Open and focus the named searches: ``F8``
+ - Create a new task: ``Ctrl+N``
+ - Edit the selected task: ``Ctrl+E``
+ - Toggle 'done' state of selected task: ``Ctrl+D``
+ - Toggle 'hidden' state of selected task: ``Ctrl+H``
+ - Toggle 'tracking' state of selected task: ``Ctrl+T``
+ - Delegate the selected task: ``Ctrl+G``
 
 
 Relative dates
@@ -644,8 +750,9 @@ implementation.
 Delegating Tasks
 ================
 
-The ``delegate`` function (on shortcut ``>`` by default) can be used to
-mark a task as delegated and trigger the delegation action.
+The ``delegate`` function (on shortcut ``>`` (pter) or ``Ctrl+G`` (qpter)
+by default) can be used to mark a task as delegated and trigger the
+delegation action.
 
 When delegating a task the configured marker is being added to the task
 (configured by ``delegation-marker`` in the configuration file).

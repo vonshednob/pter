@@ -4,139 +4,104 @@ import locale
 import pathlib
 import os
 import sys
-import re
 import datetime
 import configparser
 import string
 import webbrowser
-import urllib.parse
+
 
 try:
-    from xdg import BaseDirectory
-except ImportError:
-    BaseDirectory = None
+    from pter.qtui import run_qtui
+    qterr = None
+except ImportError as exc:
+    run_qtui = None
+    qterr = exc
 
 from pytodotxt import TodoTxt, Task, version
 from pter.searcher import Searcher, get_relative_date
 from pter.configuration import Configuration
 from pter.key import Key
-from pter.utils import toggle_tracking, ensure_up_to_date, dehumanize_dates, \
-                       parse_duration, duration_as_str, human_friendly_date, \
-                       parse_task_format
+from pter.source import Source
+from pter import common
+from pter import utils
 
 
-PROGRAMNAME = 'pter'
-HERE = pathlib.Path(os.path.abspath(__file__)).parent
-HOME = pathlib.Path.home()
-CONFIGDIR = HOME / ".config" / PROGRAMNAME
-CONFIGFILE = HOME / ".config" / PROGRAMNAME / (PROGRAMNAME + ".conf")
+def tr(text):
+    return text
 
-if BaseDirectory is not None:
-    CONFIGDIR = pathlib.Path(BaseDirectory.save_config_path(PROGRAMNAME) or CONFIGDIR)
-    CONFIGFILE = CONFIGDIR / (PROGRAMNAME + ".conf")
-
-SEARCHES_FILE = CONFIGDIR / "searches.txt"
-
-URL_RE = re.compile(r'([A-Za-z][A-Za-z0-9+\-.]*)://([^ ]+)')
-
-DELEGATE_ACTION_NONE = 'none'
-DELEGATE_ACTION_MAIL = 'mail-to'
-DELEGATE_ACTIONS = (DELEGATE_ACTION_NONE, DELEGATE_ACTION_MAIL)
-
-TF_SELECTION = 'selection'
-TF_NUMBER = 'nr'
-TF_DESCRIPTION = 'description'
-TF_DONE = 'done'
-TF_TRACKING = 'tracking'
-TF_DUE = 'due'
-TF_DUEDAYS = 'duedays'
-TF_PRIORITY = 'pri'
-TF_CREATED = 'created'
-TF_COMPLETED = 'completed'
-TF_AGE = 'age'
-DEFAULT_TASK_FORMAT = '{selection: >} {nr: >} {done} {tracking }{due }{(pri) }{description}'
 
 DEFAULT_CONFIG = {
-        'General': {
-            'use-colors': 'yes',
-            'show-numbers': 'yes',
-            'scroll-margin': 5,
-            'safe-save': 'yes',
-            'search-case-sensitive': 'yes',
-            'human-friendly-dates': '',
-            'delegation-text': '@delegated',
+        common.SETTING_GROUP_GENERAL: {
+            common.SETTING_USE_COLORS: 'yes',
+            common.SETTING_SHOW_NUMBERS: 'yes',
+            common.SETTING_SCROLL_MARGIN: 5,
+            common.SETTING_SAFE_SAVE: 'yes',
+            common.SETTING_SEARCH_CASE_SENSITIVE: 'yes',
+            common.SETTING_DEFAULT_THRESHOLD: '',
+            common.SETTING_HUMAN_DATES: '',
+            common.SETTING_DELEG_MARKER: '@delegated',
+            common.SETTING_DELEG_ACTION: common.DELEGATE_ACTION_NONE,
+            common.SETTING_DELEG_TO: 'to',
+            common.SETTING_ADD_CREATED: 'yes',
+            common.SETTING_TASK_FORMAT: common.DEFAULT_TASK_FORMAT,
+            common.SETTING_CLEAR_CONTEXT: '',
+            common.SETTING_PROTOCOLS: 'http,https,mailto,ftp,ftps',
         },
-        'Symbols': {
+        common.SETTING_GROUP_SYMBOLS: {
+            common.SETTING_ICON_SELECTION: '',
+            common.SETTING_ICON_NOT_DONE: '[ ]',
+            common.SETTING_ICON_DONE: '[x]',
+            common.SETTING_ICON_OVERFLOW_LEFT: '←',
+            common.SETTING_ICON_OVERFLOW_RIGHT: '→',
+            common.SETTING_ICON_OVERDUE: '!!',
+            common.SETTING_ICON_DUE_TODAY: '!',
+            common.SETTING_ICON_DUE_TOMORROW: '*',
+            common.SETTING_ICON_TRACKING: '@',
         },
-        'Colors': {
+        common.SETTING_GROUP_COLORS: {
+            common.SETTING_COL_NORMAL: '',
+            common.SETTING_COL_PRI_A: '',
+            common.SETTING_COL_PRI_B: '',
+            common.SETTING_COL_PRI_C: '',
+            common.SETTING_COL_INACTIVE: '',
+            common.SETTING_COL_CONTEXT: '',
+            common.SETTING_COL_PROJECT: '',
+            common.SETTING_COL_ERROR: '',
+            common.SETTING_COL_HELP_TEXT: '',
+            common.SETTING_COL_HELP_KEY: '',
+            common.SETTING_COL_OVERFLOW: '',
+            common.SETTING_COL_OVERDUE: '',
+            common.SETTING_COL_DUE_TODAY: '',
+            common.SETTING_COL_DUE_TOMORROW: '',
+            common.SETTING_COL_TRACKING: '',
         },
-        'Keys': {
+        common.SETTING_GROUP_GUICOLORS: {
+            'project': '#9c27b0',
+            'context': '#2e7d32',
         },
-        'Editor:Keys': {
+        common.SETTING_GROUP_KEYS: {
         },
-        'Highlight': {
-        }
+        common.SETTING_GROUP_EDITORKEYS: {
+        },
+        common.SETTING_GROUP_HIGHLIGHT: {
+        },
+        common.SETTING_GROUP_GUIHIGHLIGHT: {
+        },
+        common.SETTING_GROUP_GUIKEYS: {
+            common.SETTING_GK_QUIT: 'Ctrl+Q',
+            common.SETTING_GK_NEW: 'Ctrl+N',
+            common.SETTING_GK_EDIT: 'Ctrl+E',
+            common.SETTING_GK_TOGGLE_DONE: 'Ctrl+D',
+            common.SETTING_GK_SEARCH: 'Ctrl+F',
+            common.SETTING_GK_TOGGLE_TRACKING: 'Ctrl+T',
+            common.SETTING_GK_OPEN_MANUAL: 'F1',
+            common.SETTING_GK_OPEN_FILE: '',
+            common.SETTING_GK_NAMED_SEARCHES: 'F8',
+            common.SETTING_GK_FOCUS_TASKS: 'F6',
+            common.SETTING_GK_TOGGLE_HIDDEN: 'Ctrl+H',
+            common.SETTING_GK_DELEGATE: 'Ctrl+G',
+        },
 }
-
-
-def sign(n):
-    if n < 0:
-        return -1
-    elif n > 0:
-        return 1
-    return 0
-
-
-def sort_fnc(a):
-    today = datetime.datetime.now().date()
-    task, source = a
-    attrs = task.attributes
-    daydiff = 2
-    if 'due' in attrs:
-        try:
-            then = datetime.datetime.strptime(attrs['due'][0], Task.DATE_FMT).date()
-            daydiff = sign((then - today).days)
-        except ValueError:
-            daydiff = 2
-    prio = task.priority
-    if prio is None:
-        prio = 'ZZZ'
-    tracking = 'tracking' not in attrs
-    return [task.is_completed, daydiff, prio, task.linenr]
-
-
-class Source:
-    def __init__(self, source):
-        self.source = source
-        self.last_change = 0
-        self.refresh()
-
-    def refresh(self):
-        last_change = self.last_change
-        if self.filename.exists():
-            last_change = self.source.filename.stat().st_mtime
-        has_changed = False
-
-        if last_change != self.last_change:
-            self.last_change = last_change
-            has_changed = True
-
-        return has_changed
-
-    def save(self, safe=True):
-        self.source.save(safe=safe)
-        self.refresh()
-
-    def parse(self):
-        return self.source.parse()
-
-    @property
-    def tasks(self):
-        return self.source.tasks
-
-    @property
-    def filename(self):
-        return self.source.filename
 
 
 class Color:
@@ -172,8 +137,8 @@ class TaskLine:
 
     @property
     def due(self):
-        due = self.task.attributes.get('due', None)
-        if self._due is None and due is not None:
+        due = self.task.attr_due
+        if self._due is None and len(due) > 0:
             try:
                 self._due = datetime.datetime.strptime(due[0], Task.DATE_FMT).date()
             except ValueError:
@@ -196,7 +161,7 @@ class TaskLine:
 class TaskLineDescription(TaskLineGroup):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.name = TF_DESCRIPTION
+        self.name = common.TF_DESCRIPTION
 
     @property
     def space_around(self):
@@ -214,33 +179,18 @@ class TaskLineElement:
 class TaskLineSelectionIcon(TaskLineElement):
     def __init__(self, content):
         super().__init__(content, space_around=False)
-        self.name = TF_SELECTION
+        self.name = common.TF_SELECTION
 
 
 class Window:
-    NORMAL = 'normal'
-    PRI_A = 'pri-a'
-    PRI_B = 'pri-b'
-    PRI_C = 'pri-c'
-    INACTIVE = 'inactive'
-    CONTEXT = 'context'
-    PROJECT = 'project'
-    ERROR = 'error'
-    HELP_TEXT = 'help'
-    HELP_KEY = 'help-key'
-    OVERFLOW = 'overflow'
-    OVERDUE = 'overdue'
-    DUE_TODAY = 'due-today'
-    DUE_TOMORROW = 'due-tomorrow'
-    TRACKING = 'tracking'
-
     def __init__(self, sources, conf):
         self.scr = curses.initscr()
         self.quit = False
         self.sources = sources
         self.conf = conf
 
-        self.safe_save = conf.bool('General', 'safe-save', 'y')
+        self.safe_save = conf.bool(common.SETTING_GROUP_GENERAL,
+                                   common.SETTING_SAFE_SAVE, 'y')
 
         self.key_mapping = {'q': 'quit',
                             '^C': 'cancel',
@@ -282,22 +232,42 @@ class Window:
                                    '<end>': 'go-eol',
                                    '<return>': 'submit-input',
                                    }
-        self.scroll_margin = conf.number('General', 'scroll-margin', 5)
-        self.show_numbers = conf.bool('General', 'show-numbers', 'y')
-        self.selection_indicator = unquote(conf.get('Symbols', 'selection', ''))
-        self.done_marker = (unquote(conf.get('Symbols', 'not-done', '[ ]')),
-                            unquote(conf.get('Symbols', 'done', '[x]')))
-        self.overflow_marker = (unquote(conf.get('Symbols', 'overflow-left', '←')),
-                                unquote(conf.get('Symbols', 'overflow-right', '→')))
-        self.due_marker = (unquote(conf.get('Symbols', 'overdue', '!!')),
-                           unquote(conf.get('Symbols', 'due-today', '!')),
-                           unquote(conf.get('Symbols', 'due-tomorrow', '*')))
-        self.tracking_marker = unquote(conf.get('Symbols', 'tracking', '@'))
-        self.use_colors = conf.bool('General', 'use-colors', 'y')
-        self.human_friendly_dates = conf.list('General', 'human-friendly-dates', '')
-        self.task_format = parse_task_format(conf.get('General', 'task-format', DEFAULT_TASK_FORMAT))
-        self.clear_contexts = [context for context in conf.list('General', 'clear-contexts', '')
+        self.scroll_margin = conf.number(common.SETTING_GROUP_GENERAL,
+                                         common.SETTING_SCROLL_MARGIN)
+        self.show_numbers = conf.bool(common.SETTING_GROUP_GENERAL,
+                                      common.SETTING_SHOW_NUMBERS)
+        self.use_colors = conf.bool(common.SETTING_GROUP_GENERAL,
+                                    common.SETTING_USE_COLORS)
+        self.human_friendly_dates = conf.list(common.SETTING_GROUP_GENERAL,
+                                              common.SETTING_HUMAN_DATES)
+        self.task_format = utils.parse_task_format(conf.get(common.SETTING_GROUP_GENERAL,
+                                                            common.SETTING_TASK_FORMAT,
+                                                            common.DEFAULT_TASK_FORMAT))
+        self.clear_contexts = [context for context in conf.list(common.SETTING_GROUP_GENERAL,
+                                                                common.SETTING_CLEAR_CONTEXT)
                                if len(context) > 0]
+        self.add_creation_date = conf.bool(common.SETTING_GROUP_GENERAL, common.SETTING_ADD_CREATED)
+        self.protos = conf.list(common.SETTING_GROUP_GENERAL,
+                                common.SETTING_PROTOCOLS)
+
+        self.selection_indicator = utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                          common.SETTING_ICON_SELECTION))
+        self.done_marker = (utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                   common.SETTING_ICON_NOT_DONE)),
+                            utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                   common.SETTING_ICON_DONE)))
+        self.overflow_marker = (utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                       common.SETTING_ICON_OVERFLOW_LEFT)),
+                                utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                       common.SETTING_ICON_OVERFLOW_RIGHT)))
+        self.due_marker = (utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                  common.SETTING_ICON_OVERDUE)),
+                           utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                  common.SETTING_ICON_DUE_TODAY)),
+                           utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                  common.SETTING_ICON_DUE_TOMORROW)))
+        self.tracking_marker = utils.unquote(conf.get(common.SETTING_GROUP_SYMBOLS,
+                                                      common.SETTING_ICON_TRACKING))
 
         # mapable functions
         self.functions = {'quit': self.do_quit,
@@ -324,7 +294,7 @@ class Window:
                           'toggle-hidden': self.do_toggle_hidden,
                           'show-help': self.do_show_help,
                           'delegate': self.do_delegate,
-                          'open-manual': self.do_open_manual,}
+                          'open-manual': utils.open_manual,}
         self.short_name = {'quit': 'Quit',
                            'cancel': 'Cancel',
                            'select-item': 'Select',
@@ -386,22 +356,21 @@ class Window:
         self.status_bar = None
         self.help_bar = None
         self.search = Searcher('',
-                               self.conf.bool('General',
-                                              'search-case-sensitive', 'y'),
-                               self.conf.get('General',
-                                             'default-threshold', None))
-        self.delegation_marker = self.conf.get('General',
-                                               'delegation-marker', '@delegated')
-        self.delegation_action = self.conf.get('General',
-                                               'delegation-action',
-                                               DELEGATE_ACTION_NONE).lower()
-        self.delegate_to = self.conf.get('General',
-                                         'delegation-to', 'to').lower()
-        if self.delegation_action not in DELEGATE_ACTIONS:
-            self.delegation_action = DELEGATE_ACTION_NONE
+                               self.conf.bool(common.SETTING_GROUP_GENERAL,
+                                              common.SETTING_SEARCH_CASE_SENSITIVE),
+                               self.conf.get(common.SETTING_GROUP_GENERAL,
+                                             common.SETTING_DEFAULT_THRESHOLD))
+        self.delegation_marker = self.conf.get(common.SETTING_GROUP_GENERAL,
+                                               common.SETTING_DELEG_MARKER)
+        self.delegation_action = self.conf.get(common.SETTING_GROUP_GENERAL,
+                                               common.SETTING_DELEG_ACTION).lower()
+        self.delegate_to = self.conf.get(common.SETTING_GROUP_GENERAL,
+                                         common.SETTING_DELEG_TO).lower()
+        if self.delegation_action not in common.DELEGATE_ACTIONS:
+            self.delegation_action = common.DELEGATE_ACTION_NONE
 
-        for item in self.conf['Keys']:
-            fnc = self.conf.get('Keys', item, None)
+        for item in self.conf[common.SETTING_GROUP_KEYS]:
+            fnc = self.conf.get(common.SETTING_GROUP_KEYS, item, None)
             if fnc is None or fnc not in self.functions:
                 continue
 
@@ -417,8 +386,8 @@ class Window:
         if len(to_exit) == 0:
             raise RuntimeError("No key to exit")
 
-        for item in self.conf['Editor:Keys']:
-            fnc = self.conf.get('Editor:Keys', item, None)
+        for item in self.conf[common.SETTING_GROUP_EDITORKEYS]:
+            fnc = self.conf.get(common.SETTING_GROUP_EDITORKEYS, item, None)
             
             if len(item) == 1:
                 self.editor_key_mapping[item] = fnc
@@ -433,25 +402,29 @@ class Window:
             raise RuntimeError("No key to cancel editing")
 
     def update_color_pairs(self):
-        self.colors = {Window.NORMAL: [Color(7, 0), Color(0, 7)],
-                       Window.INACTIVE: [Color(8), None],
-                       Window.ERROR: [Color(1), None],
-                       Window.PRI_A: [Color(1), None],
-                       Window.PRI_B: [Color(3), None],
-                       Window.PRI_C: [Color(6), None],
-                       Window.CONTEXT: [Color(4), None],
-                       Window.PROJECT: [Color(2), None],
-                       Window.HELP_TEXT: [Color(11, 8), None],
-                       Window.HELP_KEY: [Color(2, 8), None],
-                       Window.OVERFLOW: [Color(11), None],
-                       Window.OVERDUE: [Color(7, 1), Color(1, 7)],
-                       Window.DUE_TODAY: [Color(4), None],
-                       Window.DUE_TOMORROW: [Color(6), None],
-                       Window.TRACKING: [Color(7, 2), Color(2, 7)],
+        self.colors = {common.SETTING_COL_NORMAL: [Color(7, 0), Color(0, 7)],
+                       common.SETTING_COL_INACTIVE: [Color(8), None],
+                       common.SETTING_COL_ERROR: [Color(1), None],
+                       common.SETTING_COL_PRI_A: [Color(1), None],
+                       common.SETTING_COL_PRI_B: [Color(3), None],
+                       common.SETTING_COL_PRI_C: [Color(6), None],
+                       common.SETTING_COL_CONTEXT: [Color(4), None],
+                       common.SETTING_COL_PROJECT: [Color(2), None],
+                       common.SETTING_COL_HELP_TEXT: [Color(11, 8), None],
+                       common.SETTING_COL_HELP_KEY: [Color(2, 8), None],
+                       common.SETTING_COL_OVERFLOW: [Color(11), None],
+                       common.SETTING_COL_OVERDUE: [Color(7, 1), Color(1, 7)],
+                       common.SETTING_COL_DUE_TODAY: [Color(4), None],
+                       common.SETTING_COL_DUE_TOMORROW: [Color(6), None],
+                       common.SETTING_COL_TRACKING: [Color(7, 2), Color(2, 7)],
                        }
         if curses.has_colors() and self.use_colors:
-            for colorname in self.conf['Colors']:
-                fg, bg = self.conf.color_pair('Colors', colorname, None)
+            for colorname in self.conf[common.SETTING_GROUP_COLORS]:
+                colpair = self.conf.color_pair(common.SETTING_GROUP_COLORS, colorname)
+
+                if colpair is None:
+                    continue
+                fg, bg = colpair
                 pairidx = 0
 
                 if colorname.startswith('sel-'):
@@ -469,8 +442,8 @@ class Window:
                 self.color(colorname, 0)
                 self.color(colorname, 1)
 
-            for number, key in enumerate(self.conf['Highlight']):
-                hlcol = Color(*self.conf.color_pair('Highlight', key))
+            for number, key in enumerate(self.conf[common.SETTING_GROUP_HIGHLIGHT]):
+                hlcol = Color(*self.conf.color_pair(common.SETTING_GROUP_HIGHLIGHT, key))
 
                 variant = 0
                 if key.startswith('sel-'):
@@ -494,7 +467,7 @@ class Window:
         If the color pair does not exist yet, it is registered, if possible."""
 
         if colorname is None:
-            colorname = default or Window.NORMAL
+            colorname = default or common.SETTING_COL_NORMAL
 
         if not self.use_colors or colorname not in self.colors:
             return 0
@@ -504,7 +477,7 @@ class Window:
         if variant is False:
             variant = 0
         if default is None:
-            default = Window.NORMAL
+            default = common.SETTING_COL_NORMAL
 
         colors = self.colors[colorname]
         if variant >= len(colors):
@@ -523,7 +496,7 @@ class Window:
         if default_variant is None and variant > 0:
             default_variant = self.colors[default][0]
         if default_variant is None:
-            default_variant = self.colors[Window.NORMAL][variant]
+            default_variant = self.colors[common.SETTING_COL_NORMAL][variant]
 
         if color[0] is None:
             color[0] = default_variant.fg
@@ -532,7 +505,7 @@ class Window:
             if color[1] is None and self.colors[default][0] is not None:
                 color[1] = self.colors[default][0].bg
             if color[1] is None:
-                color[1] = self.colors[Window.NORMAL][variant].bg
+                color[1] = self.colors[common.SETTING_COL_NORMAL][variant].bg
 
         color = (color[0], color[1])
 
@@ -554,17 +527,17 @@ class Window:
 
 
     def build_screen(self):
-        self.scr.attrset(self.color(Window.NORMAL))
+        self.scr.attrset(self.color(common.SETTING_COL_NORMAL))
         self.scr.noutrefresh()
         dim = self.scr.getmaxyx()
         self.task_list = curses.newwin(dim[0]-4, dim[1], 2, 0)
-        self.task_list.bkgd(' ', self.color(Window.NORMAL))
+        self.task_list.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
         self.search_bar = curses.newwin(1, dim[1], 0, 0)
-        self.search_bar.bkgd(' ', self.color(Window.NORMAL))
-        self.search_bar.addstr(0, 1, '(no search active)', self.color(Window.INACTIVE))
+        self.search_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
+        self.search_bar.addstr(0, 1, tr('(no search active)'), self.color(common.SETTING_COL_INACTIVE))
         self.search_bar.noutrefresh()
         self.status_bar = curses.newwin(1, dim[1], dim[0]-2, 0)
-        self.status_bar.bkgd(' ', self.color(Window.NORMAL))
+        self.status_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
         self.status_bar.noutrefresh()
         self.print_shortcut_bar()
         self.scr.addnstr(1, 0, '─'*dim[1], dim[1])
@@ -580,29 +553,29 @@ class Window:
         if self.help_bar is not None:
             del self.help_bar
         self.help_bar = curses.newwin(1, curses.COLS, curses.LINES-1, 0)
-        self.help_bar.bkgd(' ', self.color(Window.NORMAL))
+        self.help_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
         self.help_bar.clear()
         x = 1
         for action in actions:
             label = self.short_name.get(action, None)
             if label is None:
                 continue
-            label += " "
+            label = tr(label) + " "
 
             keys = [k for k, v in mapping.items() if v == action]
             if len(keys) == 0:
                 continue
 
             if keys[0] in Key.SPECIAL:
-                keytext = f" {Key.SPECIAL[keys[0]]} "
+                keytext = f" {tr(Key.SPECIAL[keys[0]])} "
             else:
-                keytext = f" {keys[0]} "
+                keytext = f" {tr(keys[0])} "
             if x + len(keytext) + len(label) >= self.help_bar.getmaxyx()[1]:
                 break
 
-            self.help_bar.addstr(0, x, keytext, self.color(Window.HELP_KEY))
+            self.help_bar.addstr(0, x, keytext, self.color(common.SETTING_COL_HELP_KEY))
             x += len(keytext)
-            self.help_bar.addstr(0, x, label, self.color(Window.HELP_TEXT))
+            self.help_bar.addstr(0, x, label, self.color(common.SETTING_COL_HELP_TEXT))
             x += len(label) + 1
         self.help_bar.noutrefresh()
 
@@ -610,7 +583,7 @@ class Window:
         self.tasks = []
         for source in self.sources:
             self.tasks += [(task, source) for task in source.tasks]
-        self.tasks.sort(key=sort_fnc)
+        self.tasks.sort(key=utils.sort_fnc)
 
         self.apply_search()
 
@@ -638,75 +611,75 @@ class Window:
                     textlen += 0 if right is None else len(right)
             self.max_widths[name] = max(textlen, self.max_widths[name])
 
-        update_max_width(TF_DONE, max(len(self.done_marker[0]), len(self.done_marker[1])))
-        update_max_width(TF_SELECTION, self.selection_indicator)
-        update_max_width(TF_TRACKING, self.tracking_marker)
-        update_max_width(TF_DUE, max([len(m) for m in self.due_marker]))
+        update_max_width(common.TF_DONE, max(len(self.done_marker[0]), len(self.done_marker[1])))
+        update_max_width(common.TF_SELECTION, self.selection_indicator)
+        update_max_width(common.TF_TRACKING, self.tracking_marker)
+        update_max_width(common.TF_DUE, max([len(m) for m in self.due_marker]))
 
         for nr, pair in enumerate(self.filtered_tasks):
             task, source = pair
-            line = TaskLine(task, source)
+            line = TaskLine(task, task.todotxt)
 
             # Selection indicator
             if len(self.selection_indicator) > 0:
-                line.elements[TF_SELECTION] = TaskLineSelectionIcon(self.selection_indicator)
+                line.elements[common.TF_SELECTION] = TaskLineSelectionIcon(self.selection_indicator)
 
             # Item number
             text = str(nr+1)
-            line.add(TF_NUMBER, text)
-            update_max_width(TF_NUMBER, text)
+            line.add(common.TF_NUMBER, text)
+            update_max_width(common.TF_NUMBER, text)
 
             # Done marker
-            line.add(TF_DONE, self.done_marker[1] if task.is_completed else self.done_marker[0])
+            line.add(common.TF_DONE, self.done_marker[1] if task.is_completed else self.done_marker[0])
 
             # Age
             if task.creation_date is not None:
                 text = str((datetime.date.today() - task.creation_date).days)
-                line.add(TF_AGE, text)
-                update_max_width(TF_AGE, text)
+                line.add(common.TF_AGE, text)
+                update_max_width(common.TF_AGE, text)
 
             # Creation date
             if task.creation_date is not None:
-                text = self.date_as_str(task.creation_date, TF_CREATED)
-                line.add(TF_CREATED, text)
-                update_max_width(TF_CREATED, text)
+                text = self.date_as_str(task.creation_date, common.TF_CREATED)
+                line.add(common.TF_CREATED, text)
+                update_max_width(common.TF_CREATED, text)
 
             # Completion date
             if task.completion_date is not None:
-                text = self.date_as_str(task.completion_date, TF_COMPLETED)
-                line.add(TF_COMPLETED, text)
-                update_max_width(TF_COMPLETED, text)
+                text = self.date_as_str(task.completion_date, common.TF_COMPLETED)
+                line.add(common.TF_COMPLETED, text)
+                update_max_width(common.TF_COMPLETED, text)
 
             # Tracking
-            if task.attributes.get('tracking', None) is not None:
-                line.add(TF_TRACKING, self.tracking_marker)
+            if task.attributes.get(common.ATTR_TRACKING, None) is not None:
+                line.add(common.TF_TRACKING, self.tracking_marker)
 
             # Due marker
             if line.due is not None:
                 duedays = str((line.due - today).days)
-                line.add(TF_DUEDAYS, duedays)
-                update_max_width(TF_DUEDAYS, duedays)
+                line.add(common.TF_DUEDAYS, duedays)
+                update_max_width(common.TF_DUEDAYS, duedays)
 
                 if not task.is_completed:
                     if line.due < today:
-                        line.add(TF_DUE, self.due_marker[0], Window.OVERDUE)
+                        line.add(common.TF_DUE, self.due_marker[0], common.SETTING_COL_OVERDUE)
                     elif line.due == today:
-                        line.add(TF_DUE, self.due_marker[1], Window.DUE_TODAY)
+                        line.add(common.TF_DUE, self.due_marker[1], common.SETTING_COL_DUE_TODAY)
                     elif line.due == today + datetime.timedelta(days=1):
-                        line.add(TF_DUE, self.due_marker[2], Window.DUE_TOMORROW)
+                        line.add(common.TF_DUE, self.due_marker[2], common.SETTING_COL_DUE_TOMORROW)
 
             # Priority marker
             if task.priority is not None:
                 pri = task.priority.upper()
                 attrs = None
                 if pri == 'A':
-                    attrs = Window.PRI_A
+                    attrs = common.SETTING_COL_PRI_A
                 elif pri == 'B':
-                    attrs = Window.PRI_B
+                    attrs = common.SETTING_COL_PRI_B
                 elif pri == 'C':
-                    attrs = Window.PRI_C
-                line.add(TF_PRIORITY, f"{pri}", attrs)
-                update_max_width(TF_PRIORITY, '(A)')
+                    attrs = common.SETTING_COL_PRI_C
+                line.add(common.TF_PRIORITY, f"{pri}", attrs)
+                update_max_width(common.TF_PRIORITY, '(A)')
 
             # Description
             description = TaskLineDescription()
@@ -718,27 +691,27 @@ class Window:
                     attr = None
 
                     if word.startswith('@'):
-                        attr = Window.CONTEXT
+                        attr = common.SETTING_COL_CONTEXT
                     elif word.startswith('+'):
-                        attr = Window.PROJECT
+                        attr = common.SETTING_COL_PROJECT
                     elif ':' in word:
                         key, value = word.split(':', 1)
                         if 'hl:' + key in self.colors:
                             attr = 'hl:' + key
-                        if key in ['t', 'due']:
+                        if key in [common.ATTR_T, common.ATTR_DUE]:
                             word = key + ':' + self.date_as_str(value, key)
-                        if key == 'pri':
+                        if key == common.ATTR_PRI:
                             attr = None
                             value = value.upper()
                             if value == 'A':
-                                attr = Window.PRI_A
+                                attr = common.SETTING_COL_PRI_A
                             elif value == 'B':
-                                attr = Window.PRI_B
+                                attr = common.SETTING_COL_PRI_B
                             elif value == 'C':
-                                attr = Window.PRI_C
+                                attr = common.SETTING_COL_PRI_C
                     description.append(word, attr, space_around=True)
-            line.elements[TF_DESCRIPTION] = description
-            update_max_width(TF_DESCRIPTION, ' '.join([e.content for e in description.elements]))
+            line.elements[common.TF_DESCRIPTION] = description
+            update_max_width(common.TF_DESCRIPTION, ' '.join([e.content for e in description.elements]))
 
             self.task_lines.append(line)
 
@@ -765,8 +738,8 @@ class Window:
         self.task_list.noutrefresh()
 
     def date_as_str(self, text, hint=''):
-        if 'all' in self.human_friendly_dates or hint in self.human_friendly_dates:
-            return human_friendly_date(text)
+        if common.TF_ALL in self.human_friendly_dates or hint in self.human_friendly_dates:
+            return utils.human_friendly_date(text)
         if not isinstance(text, str):
             return text.strftime(Task.DATE_FMT)
         return text
@@ -774,17 +747,17 @@ class Window:
     def write_task(self, y, x, nr, taskline):
         line = ''
         is_selected = nr == self.selected_task
-        is_tracked = taskline.task.attributes.get('tracking', None) is not None
+        is_tracked = len(taskline.task.attr_tracking) > 0
 
-        baseattrs = Window.NORMAL
+        baseattrs = common.SETTING_COL_NORMAL
         if taskline.is_overdue:
-            baseattrs = Window.OVERDUE
+            baseattrs = common.SETTING_COL_OVERDUE
         elif taskline.is_due_tomorrow:
-            baseattrs = Window.DUE_TOMORROW
+            baseattrs = common.SETTING_COL_DUE_TOMORROW
         elif taskline.is_due_today:
-            baseattrs = Window.DUE_TODAY
+            baseattrs = common.SETTING_COL_DUE_TODAY
         if is_tracked:
-            baseattrs = Window.TRACKING
+            baseattrs = common.SETTING_COL_TRACKING
 
         maxwidth = self.task_list.getmaxyx()[1]-1
 
@@ -825,7 +798,7 @@ class Window:
             self.task_list.addstr(y, x, elem, self.color(element.color, is_selected, baseattrs))
 
             if cut_off:
-                attrs = Window.OVERFLOW
+                attrs = common.SETTING_COL_OVERFLOW
                 self.task_list.addstr(y, x+maxwidth-len(self.overflow_marker[1]),
                                       self.overflow_marker[1],
                                       self.color(attrs, is_selected, baseattrs))
@@ -926,7 +899,7 @@ class Window:
 
     def read_jump_to(self, start):
         self.status_bar.clear()
-        self.status_bar.addstr(0, 0, 'Jump to: ')
+        self.status_bar.addstr(0, 0, tr('Jump to:') + ' ')
         self.status_bar.refresh()
         number = self.read_text(curses.LINES-2, 9, text=start)
         self.status_bar.erase()
@@ -963,7 +936,7 @@ class Window:
     def refresh_search_bar(self):
         self.search_bar.erase()
         if len(self.search.text.strip()) == 0:
-            self.search_bar.addstr(0, 1, '(no search active)', self.color(Window.INACTIVE))
+            self.search_bar.addstr(0, 1, tr('(no search active)'), self.color(common.SETTING_COL_INACTIVE))
         else:
             self.search_bar.addstr(0, 1, self.search.text)
         self.search_bar.refresh()
@@ -972,7 +945,7 @@ class Window:
         if cols is None:
             cols = curses.COLS-x-1
         editor = curses.newwin(1, cols, y, x)
-        editor.bkgdset(' ', self.color(Window.NORMAL))
+        editor.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
         scroll = 0
         margin = 5
         max_width = cols-1
@@ -993,10 +966,10 @@ class Window:
             elif curpos <= scroll + margin:
                 scroll = max(0, curpos - margin)
             if scroll > 0:
-                editor.addstr(0, 0, self.overflow_marker[0], self.color(Window.OVERFLOW))
+                editor.addstr(0, 0, self.overflow_marker[0], self.color(common.SETTING_COL_OVERFLOW))
             if len(text)-scroll >= max_width-1:
                 editor.addstr(0, max_width-len(self.overflow_marker[1]),
-                              self.overflow_marker[1], self.color(Window.OVERFLOW))
+                              self.overflow_marker[1], self.color(common.SETTING_COL_OVERFLOW))
             editor.addstr(0, 1, text[scroll:scroll+max_width-2])
             editor.move(0, 1 + curpos-scroll)
             editor.refresh()
@@ -1066,7 +1039,7 @@ class Window:
         frame = curses.newwin(h+2, w+2,
                               curses.LINES//2 - h//2 - 1,
                               curses.COLS//2 - w//2 - 1)
-        frame.bkgdset(' ', self.color(Window.NORMAL))
+        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
 
         scroll = 0
         margin = 2
@@ -1079,7 +1052,7 @@ class Window:
                 scroll = min(max(0, len(options) - h), selection - h + margin + 1)
             frame.erase()
             frame.border()
-            if title is not None and w > len(title) + 5:
+            if title is not None and w > len(title) + 6:
                 frame.addstr(0, 2, f'┤{title}├')
 
             for nr, option in enumerate(options):
@@ -1091,7 +1064,7 @@ class Window:
                 y = 1 + nr - scroll
                 line = ''
 
-                attrs = self.color(Window.NORMAL, nr == selection)
+                attrs = self.color(common.SETTING_COL_NORMAL, nr == selection)
 
                 if len(self.selection_indicator) > 0:
                     if selection == nr:
@@ -1183,7 +1156,7 @@ class Window:
             return
 
         contexts.sort()
-        context = self.select_one(contexts, "Select context")
+        context = self.select_one(contexts, tr("Select Context"))
 
         if context is not None:
             context = '@' + context
@@ -1205,7 +1178,7 @@ class Window:
             return
 
         projects.sort()
-        project = self.select_one(projects, "Select project")
+        project = self.select_one(projects, tr("Select Project"))
 
         if project is not None:
             project = '+' + project
@@ -1221,12 +1194,14 @@ class Window:
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
         task, source = self.filtered_tasks[self.selected_task]
-        task = ensure_up_to_date(source, task)
+        task = utils.ensure_up_to_date(task)
         if task is not None:
-            self.toggle_done(task)
+            utils.toggle_done(task, self.clear_contexts)
             source.save(safe=self.safe_save)
         else:
-            self.status_bar.addstr(0, 0, "Not changed: task was modified in the background", self.color(Window.ERROR))
+            self.status_bar.addstr(0, 0,
+                                   tr("Not changed: task was modified in the background"),
+                                   self.color(common.SETTING_COL_ERROR))
             self.status_bar.noutrefresh()
         self.update_tasks()
 
@@ -1234,12 +1209,14 @@ class Window:
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
         task, source = self.filtered_tasks[self.selected_task]
-        task = ensure_up_to_date(source, task)
+        task = utils.ensure_up_to_date(task)
         if task is not None:
-            toggle_hidden(task)
+            utils.toggle_hidden(task)
             source.save(safe=self.safe_save)
         else:
-            self.status_bar.addstr(0, 0, "Not changed: task was modified in the background", self.color(Window.ERROR))
+            self.status_bar.addstr(0, 0,
+                                   tr("Not changed: task was modified in the background"),
+                                   self.color(common.SETTING_COL_ERROR))
             self.status_bar.noutrefresh()
         self.update_tasks()
 
@@ -1247,16 +1224,19 @@ class Window:
         source = self.sources[0]  # TODO: maybe this should be configurable
         y = curses.LINES//2 - 1
         frame = curses.newwin(3, curses.COLS-6, y, 3)
-        frame.bkgdset(' ', self.color(Window.NORMAL))
+        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
         frame.erase()
         frame.border()
-        if curses.COLS-6 > 15:
-            frame.addstr(0, 2, '┤New Task├')
+        label = tr('New Task')
+        if curses.COLS-8 > len(label):
+            frame.addstr(0, 2, f'┤{label}├')
         frame.refresh()
-        today = datetime.datetime.now().strftime(Task.DATE_FMT) + ' '
+        today = ''
+        if self.add_creation_date:
+            today = datetime.datetime.now().strftime(Task.DATE_FMT) + ' '
         text = self.read_text(y+1, 4, curses.COLS-8, today)
         if text is not None:
-            text = dehumanize_dates(text)
+            text = utils.dehumanize_dates(text)
         frame.erase()
         del frame
         if text is not None and len(text.strip()) > 0:
@@ -1274,11 +1254,12 @@ class Window:
             return
         y = curses.LINES//2 - 1
         frame = curses.newwin(3, curses.COLS-6, y, 3)
-        frame.bkgdset(' ', self.color(Window.NORMAL))
+        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
         frame.erase()
         frame.border()
-        if curses.COLS-6 > 15:
-            frame.addstr(0, 2, '┤Edit Task├')
+        label = tr('Edit Task')
+        if curses.COLS-8 > len(label):
+            frame.addstr(0, 2, f'┤{label}├')
         frame.refresh()
         task, source = self.filtered_tasks[self.selected_task]
         if source.refresh():
@@ -1290,30 +1271,34 @@ class Window:
                 task = these[0]
             else:
                 frame.erase()
-                self.status_bar.addstr(0, 0, "Cannot edit: task was modified in the background", self.color(Window.ERROR))
+                self.status_bar.addstr(0, 0,
+                                       tr("Cannot edit: task was modified in the background"),
+                                       self.color(common.SETTING_COL_ERROR))
                 self.status_bar.noutrefresh()
                 return
         text = self.read_text(y+1, 4, curses.COLS-8, str(task).strip())
         if text is not None:
-            text = dehumanize_dates(text)
+            text = utils.dehumanize_dates(text)
         frame.erase()
         del frame
         if text is not None and text.strip() != str(task).strip():
-            task = ensure_up_to_date(source, task)
+            task = utils.ensure_up_to_date(task)
             if task is not None:
                 task.parse(text)
                 source.save(safe=self.safe_save)
             else:
-                self.status_bar.addstr(0, 0, "Not changed: task was modified in the background", self.color(Window.ERROR))
+                self.status_bar.addstr(0, 0,
+                                       tr("Not changed: task was modified in the background"),
+                                       self.color(common.SETTING_COL_ERROR))
                 self.status_bar.noutrefresh()
             self.update_tasks()
 
     def do_load_search(self):
-        searches = parse_searches()
+        searches = utils.parse_searches()
         if len(searches) == 0:
             return
         names = [name for name in sorted(searches.keys())]
-        name = self.select_one(names, 'Load search', autoselect=False)
+        name = self.select_one(names, tr('Load Search'), autoselect=False)
         if names is not None and name in searches:
             self.search.text = searches[name]
             self.refresh_search_bar()
@@ -1323,19 +1308,20 @@ class Window:
     def do_save_search(self):
         y = curses.LINES//2 - 1
         frame = curses.newwin(3, curses.COLS-6, y, 3)
-        frame.bkgdset(' ', self.color(Window.NORMAL))
+        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
         frame.erase()
         frame.border()
-        if curses.COLS-6 > 17:
-            frame.addstr(0, 2, '┤Save search├')
+        label = tr('Save Search')
+        if curses.COLS-8 > len(label):
+            frame.addstr(0, 2, f'┤{label}├')
         frame.refresh()
 
         text = self.read_text(y+1, 4, curses.COLS-8, '')
 
         if text is not None and len(text.strip()) > 0:
-            searches = parse_searches()
+            searches = utils.parse_searches()
             searches[text] = self.search.text
-            save_searches(searches)
+            utils.save_searches(searches)
 
         frame.erase()
         del frame
@@ -1349,14 +1335,16 @@ class Window:
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
         task, source = self.filtered_tasks[self.selected_task]
-        task = ensure_up_to_date(source, task)
+        task = utils.ensure_up_to_date(task)
         if task is None:
-            self.status_bar.addstr(0, 0, "Not tracked: task was modified in the background", self.color(Window.ERROR))
+            self.status_bar.addstr(0, 0,
+                                   tr("Not tracked: task was modified in the background"),
+                                   self.color(common.SETTING_COL_ERROR))
             self.status_bar.noutrefresh()
             self.update_tasks()
             return
         
-        if toggle_tracking(task):
+        if utils.toggle_tracking(task):
             source.save(safe=self.safe_save)
 
         self.update_tasks()
@@ -1367,9 +1355,6 @@ class Window:
         self.refresh_search_bar()
 
     def do_open_url(self):
-        # TODO: maybe have the supported protocols configurable?
-        protos = ['http', 'https', 'mailto', 'ftp', 'ftps']
-
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
 
@@ -1379,8 +1364,8 @@ class Window:
         if task.description is None:
             return
 
-        for match in URL_RE.finditer(task.description):
-            if match.group(1) not in protos:
+        for match in common.URL_RE.finditer(task.description):
+            if match.group(1) not in self.protos:
                 continue
             urls.append(match.group(0))
 
@@ -1393,7 +1378,7 @@ class Window:
                 continue
             urls.append(url)
 
-        url = self.select_one(urls, "Select URL")
+        url = self.select_one(urls, tr("Select URL"))
         if url is not None:
             webbrowser.open(url)
 
@@ -1415,41 +1400,20 @@ class Window:
             self.do_delegation_action(task)
             return
         
-        task = ensure_up_to_date(source, task)
+        task = utils.ensure_up_to_date(task)
         if task is not None:
             task.description += ' ' + self.delegation_marker.strip()
             source.save(safe=self.safe_save)
             self.do_delegation_action(task)
         else:
-            self.status_bar.addstr(0, 0, "Not delegated: task was modified in the background", self.color(Window.ERROR))
+            self.status_bar.addstr(0, 0,
+                                   tr("Not delegated: task was modified in the background"),
+                                   self.color(common.SETTING_COL_ERROR))
             self.status_bar.noutrefresh()
         self.update_tasks()
 
     def do_delegation_action(self, task):
-        if self.delegation_action == DELEGATE_ACTION_NONE:
-            return
-
-        recipient = ''
-        to_attr = self.delegate_to
-        attrs = task.attributes
-        if len(to_attr) > 0 and to_attr in attrs:
-            recipient = ','.join(attrs[to_attr])
-
-        if self.delegation_action == DELEGATE_ACTION_MAIL:
-            # filter out to: (to_attr) and the delegation marker
-            text = ' '.join([word for word in str(task).split(' ')
-                             if word != self.delegation_marker
-                                and (len(to_attr) == 0
-                                     or not word.startswith(to_attr + ':'))])
-            uri = 'mailto:' + recipient + '?Subject=' + urllib.parse.quote(text)
-            webbrowser.open(uri)
-
-    @staticmethod
-    def do_open_manual():
-        docloc = HERE / "docs" / "pter.html"
-
-        if docloc.exists():
-            webbrowser.open('file://' + str(docloc))
+        utils.execute_delegate_action(task, self.delegate_to, self.delegation_marker, self.delegation_action)
 
     def do_show_help(self):
         def collect_name_fnc(fncs, mapping):
@@ -1466,25 +1430,25 @@ class Window:
                      'reload-tasks']
         other_fncs = ['open-url']
 
-        lines = [('TASK LIST', ''), ('', ''), ('Program', '')]
+        lines = [(tr('TASK LIST'), ''), ('', ''), (tr('Program'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(meta_fncs, self.key_mapping)]
-        lines += [('', ''), ('Navigation', '')]
+        lines += [('', ''), (tr('Navigation'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(nav_fncs, self.key_mapping)]
-        lines += [('', ''), ('Search', '')]
+        lines += [('', ''), (tr('Search'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(search_fncs, self.key_mapping)]
-        lines += [('', ''), ('Change Tasks', '')]
+        lines += [('', ''), (tr('Change Tasks'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(edt_fncs, self.key_mapping)]
-        lines += [('', ''), ('Other', '')]
+        lines += [('', ''), (tr('Other'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(other_fncs, self.key_mapping)]
 
         edt_nav_fncs = ['go-left', 'go-right', 'go-bol', 'go-eol']
         edt_edt_fncs = ['del-left', 'del-right', 'del-to-bol']
         edt_meta_fncs = ['cancel', 'submit-input']
-        lines += [('', ''), ('', ''), ('TASK EDITING', ''), ('', ''), ('General', '')]
+        lines += [('', ''), ('', ''), (tr('TASK EDITING'), ''), ('', ''), (tr('General'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(edt_meta_fncs, self.editor_key_mapping)]
-        lines += [('', ''), ('Navigation', '')]
+        lines += [('', ''), (tr('Navigation'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(edt_nav_fncs, self.editor_key_mapping)]
-        lines += [('', ''), ('Deletion', '')]
+        lines += [('', ''), (tr('Deletion'), '')]
         lines += [(name, key) for name, key in collect_name_fnc(edt_edt_fncs, self.editor_key_mapping)]
 
         maxnamelen = max([len(n) for n, _ in lines])
@@ -1497,7 +1461,7 @@ class Window:
                     curses.update_lines_cols()
                     frame = curses.newwin(curses.LINES-1, curses.COLS, 0, 0)
                     frame.clear()
-                    frame.bkgd(' ', self.color(Window.NORMAL))
+                    frame.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
                     self.print_shortcut_bar(['quit',])
                 else:
                     frame.clear()
@@ -1508,9 +1472,9 @@ class Window:
                         continue
                     if idx >= scroll + frame.getmaxyx()[0] - 2:
                         continue
-                    attrs = Window.NORMAL
+                    attrs = common.SETTING_COL_NORMAL
                     if line[1] == '':
-                        attrs = Window.CONTEXT
+                        attrs = common.SETTING_COL_CONTEXT
                     frame.addstr(idx+1-scroll, 1, line[0] + " "*(maxnamelen-len(line[0])+3) + line[1], self.color(attrs))
                     frame.clrtoeol()
                 frame.clrtobot()
@@ -1555,90 +1519,22 @@ class Window:
         self.do_refresh_screen()
 
 
-    def toggle_done(self, task):
-        task.is_completed = not task.is_completed
-        if task.is_completed:
-            task.completion_date = datetime.datetime.now().date()
-            if task.priority is not None:
-                task.add_attribute('pri', task.priority)
-                task.priority = None
-            if len(self.clear_contexts) > 0 and task.description is not None:
-                for context in self.clear_contexts:
-                    while f'@{context}' in task.description:
-                        task.remove_context(context)
-        else:
-            task.completion_date = None
-            attrs = task.attributes
-            if 'pri' in attrs:
-                task.priority = attrs['pri'][0]
-                task.remove_attribute('pri')
-        task.raw = str(task)
-
-
-def toggle_hidden(task):
-    attrs = task.attributes
-    if 'h' in attrs:
-        is_hidden = attrs['h'][0] == '1'
-        task.remove_attribute('h', '1')
-        if not is_hidden:
-            task.add_attribute('h', '1')
-    else:
-        task.add_attribute('h', '1')
-    task.raw = str(task)
-
-
-def parse_searches():
-    if not SEARCHES_FILE.exists():
-        return {}
-
-    searches = {}
-    with open(SEARCHES_FILE, 'rt', encoding="utf-8") as fd:
-        for linenr, line in enumerate(fd.readlines()):
-            if '=' not in line:
-                continue
-            name, searchdef = line.split("=", 1)
-            name = name.strip()
-            searchdef = searchdef.strip()
-            if len(name) == 0 or len(searchdef) == 0:
-                continue
-            searches[name.strip()] = searchdef.strip()
-
-    return searches
-
-
-def save_searches(searches):
-    with open(SEARCHES_FILE, 'wt', encoding="utf-8") as fd:
-        for name in sorted(searches.keys()):
-            value = searches[name].strip()
-            if len(value) == 0:
-                continue
-            fd.write(f"{name} = {value}\n")
-
-
-def unquote(text):
-    if len(text) <= 1:
-        return text
-    if text[0] in '"\'' and text[0] == text[-1]:
-        return text[1:-1]
-    return text
-
-
 def run():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config',
                         type=str,
-                        default=CONFIGFILE,
-                        help="Location of your configuration file. Defaults to %(default)s.")
+                        default=common.CONFIGFILE,
+                        help=tr("Location of your configuration file. Defaults to %(default)s."))
     parser.add_argument('filename',
                         type=str,
-                        nargs='+',
-                        help='todo.txt file to open')
+                        nargs='*',
+                        help=tr('todo.txt file(s) to open'))
     args = parser.parse_args(sys.argv[1:])
 
     locale.setlocale(locale.LC_ALL, '')
     code = locale.getpreferredencoding()
 
-    sources = [Source(TodoTxt(fn)) for fn in args.filename]
+    sources = [Source(TodoTxt(pathlib.Path(fn).expanduser().resolve())) for fn in args.filename]
     for source in sources:
         if source.filename.exists():
             source.parse()
@@ -1650,16 +1546,34 @@ def run():
     if conffile.exists() and conffile.is_file():
         conf.read([conffile])
 
-    window = Window(sources, Configuration(conf))
-    exception = None
+    if pathlib.Path(sys.argv[0]).name == 'qpter':
+        success = -1
+        if run_qtui is None:
+            print(tr("PyQt5 is not installed or could otherwise not be imported: {}").format(qterr),
+                  file=sys.stderr)
+        else:
+            success = 0
+            run_qtui(Configuration(conf), sources, args)
 
-    try:
-        window.run()
-    except Exception as exc:
-        exception = exc
-    
-    curses.endwin()
+    elif len(sources) == 0:
+        success = -1
+        print(tr("To start pter you must provide at least one todo.txt file. See --help for more information."),
+              file=sys.stderr)
+    else:
+        success = 0
+        window = Window(sources, Configuration(conf))
+        exception = None
 
-    if exception is not None:
-        raise exception
+        try:
+            window.run()
+        except Exception as exc:
+            exception = exc
+        
+        curses.endwin()
+
+        if exception is not None:
+            raise exception
+            success = -1
+
+    return success
 

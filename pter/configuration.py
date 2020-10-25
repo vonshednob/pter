@@ -9,8 +9,14 @@ class Configuration:
     def sections(self):
         return self.conf.sections()
 
+    def __contains__(self, item):
+        return item in self.conf
+
     def get(self, group, item, default=None):
-        return self.conf[group].get(item, default)
+        if group in self.conf:
+            return self.conf[group].get(item, default)
+        else:
+            return default
 
     def bool(self, group, item, default='n'):
         return self.get(group, item, default).lower() in ['y', 'yes', '1', 'true', 'on']
@@ -26,7 +32,7 @@ class Configuration:
 
     def color_pair(self, group, item, default=None):
         value = self.get(group, item, default)
-        if value is None:
+        if value is None or len(value) == 0:
             return None
 
         result = [None, None]

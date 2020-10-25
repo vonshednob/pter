@@ -16,8 +16,8 @@ class Searcher:
         self.show_hidden = False
         self.priority = None
         self.default_threshold = default_threshold
-        if default_threshold is None:
-            self.default_threshold = datetime.datetime.now().strftime(Task.DATE_FMT)
+        if default_threshold is None or len(default_threshold) == 0:
+            self.default_threshold = 'today'
         self.threshold = self.default_threshold
         self.due = None
         self.created = None
@@ -39,7 +39,7 @@ class Searcher:
         self.done = None
         self.show_hidden = False
         self.priority = None
-        self.threshold = self.default_threshold
+        self.threshold = get_relative_date(self.default_threshold, Task.DATE_FMT) or self.default_threshold
         self.due = None
         self.created = None
         self.completed = None

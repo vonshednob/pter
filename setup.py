@@ -1,8 +1,12 @@
 import setuptools
 import pathlib
 
-import docutils.core
-from docutils.writers import manpage
+try:
+    import docutils.core
+    from docutils.writers import manpage
+except ImportError:
+    docutils = None
+    manpage = None
 
 from pter import version
 
@@ -18,6 +22,9 @@ with open('LICENSE', encoding='utf-8') as fd:
 def compile_documentation():
     htmlfiles = []
 
+    if docutils is None:
+        return htmlfiles
+
     dst = pathlib.Path('./pter/docs')
     dst.mkdir(exist_ok=True)
     
@@ -25,15 +32,16 @@ def compile_documentation():
 
     man_pter = None
 
-    for fn in pathlib.Path('./doc').iterdir():
-        if fn.suffix == '.rst':
-            if fn.stem == 'pter':
-                man_pter = str(fn)
-            dstfn = str(dst / (fn.stem + '.html'))
-            docutils.core.publish_file(source_path=str(fn),
-                                       destination_path=dstfn,
-                                       writer_name='html')
-            htmlfiles.append('docs/' + fn.stem + '.html')
+    if None not in [docutils, manpage]:
+        for fn in pathlib.Path('./doc').iterdir():
+            if fn.suffix == '.rst':
+                if fn.stem == 'pter':
+                    man_pter = str(fn)
+                dstfn = str(dst / (fn.stem + '.html'))
+                docutils.core.publish_file(source_path=str(fn),
+                                           destination_path=dstfn,
+                                           writer_name='html')
+                htmlfiles.append('docs/' + fn.stem + '.html')
 
     if man_pter is not None:
         docutils.core.publish_file(source_path=man_pter,
@@ -52,10 +60,11 @@ setuptools.setup(
     url="https://github.com/vonshednob/pter",
     author="R",
     author_email="devel+pter@kakaomilchkuh.de",
-    entry_points={'console_scripts': ['pter=pter.main:run']},
+    entry_points={'console_scripts': ['pter=pter.main:run'],
+                  'gui_scripts': ['qpter=pter.main:run']},
     packages=['pter'],
     package_data={'pter': [] + compile_documentation()},
-    install_requires=['pytodotxt>=1.0'],
+    install_requires=['pytodotxt>=1.0.3'],
     extras_require={'xdg': ['pyxdg']},
     python_requires='>=3.0',
     classifiers=['Development Status :: 4 - Beta',
