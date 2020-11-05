@@ -3,6 +3,7 @@ import string
 import re
 import webbrowser
 import urllib.parse
+import os
 
 from pter.searcher import get_relative_date
 from pter import common
@@ -374,8 +375,17 @@ def save_searches(searches):
 
 
 def update_displaynames(sources):
-    # TODO: produce minimal, but unique names based on the filename
-    pass
+    if len(sources) == 0:
+        return
+
+    pos = 2
+    while True:
+        displaynames = {source.displayname for source in sources}
+        if len(displaynames) == len(sources):
+            return
+        for source in sources:
+            source.displayname = os.sep.join(str(source.filename).split(os.sep)[-1*pos:])
+        pos += 1
 
 
 def execute_delegate_action(task, to_attr, marker, action):
@@ -394,4 +404,20 @@ def execute_delegate_action(task, to_attr, marker, action):
                                  or not word.startswith(to_attr + ':'))])
         uri = 'mailto:' + urllib.parse.quote(recipient) + '?Subject=' + urllib.parse.quote(text)
         webbrowser.open(uri)
+
+
+def new_task_id(sources, prefix=""):
+    """Generate a new unique task ID
+    The task ID will be unique for the given sources, and with the given prefix.
+    """
+    existing_ids = set()
+    for source in sources:
+        existing_ids |= {key for key in source.task_ids if key.startswith(prefix) and key[len(prefix):].isnumeric()}
+
+    if len(existing_ids) > 0:
+        highest = int(max(existing_ids)[len(prefix):])
+    else:
+        highest = 0
+
+    return prefix + str(highest+1)
 

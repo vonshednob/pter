@@ -20,7 +20,7 @@ CACHEFILE = CACHEDIR / (PROGRAMNAME + ".settings")
 if BaseDirectory is not None:
     CONFIGDIR = pathlib.Path(BaseDirectory.save_config_path(PROGRAMNAME) or CONFIGDIR)
     CONFIGFILE = CONFIGDIR / (PROGRAMNAME + ".conf")
-    CACHEDIR = pathlib.Path(BaseDirectory.save_config_path(PROGRAMNAME) or CACHEDIR)
+    CACHEDIR = pathlib.Path(BaseDirectory.save_cache_path(PROGRAMNAME) or CACHEDIR)
     CACHEFILE = CACHEDIR / (PROGRAMNAME + ".settings")
 
 SEARCHES_FILE = CONFIGDIR / "searches.txt"
@@ -32,6 +32,7 @@ ATTR_TRACKING = 'tracking'
 ATTR_T = 't'
 ATTR_DUE = 'due'
 ATTR_PRI = 'pri'
+ATTR_ID = 'id'
 
 DELEGATE_ACTION_NONE = 'none'
 DELEGATE_ACTION_MAIL = 'mail-to'
@@ -46,6 +47,7 @@ SETTING_GROUP_EDITORKEYS = 'Editor:Keys'
 SETTING_GROUP_GUICOLORS = 'GUI:Colors'
 SETTING_GROUP_GUIHIGHLIGHT = 'GUI:Highlight'
 SETTING_GROUP_GUIKEYS = 'GUI:Keys'
+SETTING_GROUP_GUI = 'GUI'
 SETTING_HUMAN_DATES = 'human-friendly-dates'
 SETTING_PROTOCOLS = 'protocols'
 SETTING_DELEG_MARKER = 'delegation-marker'
@@ -60,6 +62,8 @@ SETTING_SHOW_NUMBERS = 'show-numbers'
 SETTING_USE_COLORS = 'use-colors'
 SETTING_TASK_FORMAT = 'task-format'
 SETTING_CLEAR_CONTEXT = 'clear-context'
+SETTING_FONT = 'font'
+SETTING_FONTSIZE = 'font-size'
 SETTING_ICON_SELECTION = 'selection'
 SETTING_ICON_NOT_DONE = 'not-done'
 SETTING_ICON_DONE = 'done'

@@ -1,3 +1,6 @@
+from pter import common
+
+
 class Source:
     def __init__(self, source):
         self.source = source
@@ -5,6 +8,7 @@ class Source:
         self.displayname = self.filename.name
         self._contexts = set()
         self._projects = set()
+        self._task_by_id = {}
         self.refresh()
 
     @property
@@ -15,17 +19,32 @@ class Source:
     def projects(self):
         return self._projects
 
+    @property
+    def task_ids(self):
+        return set(self._task_by_id.keys())
+
     def __lt__(self, other):
         return self.displayname < other.displayname
 
     def update_contexts_and_projects(self):
         self._projects = set()
         self._contexts = set()
+        self_task_by_id = {}
         for task in self.source.tasks:
-            if task.description is None or len(task.description) == 0:
-                continue
-            self._projects |= {word for word in task.description.split(' ') if word.startswith('+')}
-            self._contexts |= {word for word in task.description.split(' ') if word.startswith('@')}
+            self.update_from_task(task)
+
+    def update_from_task(self, task):
+        if task.description is None or len(task.description) == 0:
+            return
+        for word in task.description.split(' '):
+            if word.startswith('+'):
+                self._projects.add(word)
+            elif word.startswith('@'):
+                self._contexts.add(word)
+            elif word.startswith(common.ATTR_ID + ':'):
+                _, taskid = word.split(':', 1)
+                if len(taskid) > 0:
+                    self._task_by_id[taskid] = task
 
     def refresh(self):
         last_change = self.last_change
@@ -46,13 +65,14 @@ class Source:
     def parse(self):
         self._projects = set()
         self._contexts = set()
+        self._task_by_id = {}
         for task in self.source.parse():
             task.todotxt = self
-            if task.description is None or len(task.description) == 0:
-                continue
-            self._projects |= {word for word in task.description.split(' ') if word.startswith('+')}
-            self._contexts |= {word for word in task.description.split(' ') if word.startswith('@')}
+            self.update_from_task(task)
         return self.source.tasks
+
+    def task(self, taskid, default=None):
+        return self._task_by_id.get(taskid, default)
 
     @property
     def tasks(self):

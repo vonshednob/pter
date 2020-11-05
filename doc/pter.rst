@@ -75,6 +75,7 @@ The configuration file has four sections (the names are case-sensitive):
  - `GUI:Colors`_, for coloring the tasks in the GUI,
  - `Highlight`_, for coloring specific tags of tasks,
  - GUI:Highlight, for coloring specific tags of tasks (GUI version, see `Highlight`_).
+ - `GUI`_, for other GUI specific options
 
 General
 -------
@@ -235,6 +236,8 @@ And the second list of functions for edit fields:
  - ``go-left``, move the cursor one character to the left
  - ``go-right``, move the cursor one charackter to the right
  - ``submit-input``, accept the changes, leave the editor (applies the changes)
+ - ``select-file``, when creating a new task, this allows you to select
+   what todo.txt file to save the task in
 
 Keyboard shortcuts are given by their character, for example ``d``.
 To indicate the shift key, use the upper-case of that letter (``D`` in this
@@ -463,6 +466,19 @@ The following fields exist:
 ``description`` is potentially consuming the whole line, so you might want to
 put it last in your ``task-format``.
 
+
+GUI
+----
+
+The GUI specific options are defined in the ``[GUI]`` section:
+
+  ``font``
+    The name of the font to use for the task list.
+
+  ``font-size``
+    The font size to use for the task list. You can specify the size either
+    in pixel (eg. ``12px``) or point size (eg. ``14pt``). Unlike pixel
+    sizes, point sizes may be a non-integer number, eg. ``16.8pt``. 
 
 
 Keyboard controls

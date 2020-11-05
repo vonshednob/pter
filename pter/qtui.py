@@ -16,6 +16,7 @@ from pter import utils
 from pter import version
 from pter.source import Source
 from pter.searcher import Searcher
+from pter.tr import tr
 from pter.configuration import Configuration
 
 
@@ -25,6 +26,17 @@ NAMED_COLOR = re.compile(r'^[a-zA-Z]+$')
 TASK_ROLE = Qt.UserRole + 1
 SOURCE_ROLE = Qt.UserRole + 2
 SORT_ROLE = Qt.UserRole + 3
+
+ICON_PATH = common.HERE / "icons"
+
+ABOUT_DIALOG_TEXT = '''<h1>About qpter</h1>
+<h2>Personal Task Entropy Reducer</h2>
+<p>qpter is the Qt user interface to pter.</p>
+<p>This is version {version}.</p>
+<h2>License</h2>
+<p>pter is open source software and licensed under MIT License. You
+can obtain the source code from <a href="https://github.com/vonshednob/pter">GitHub</a>
+or <a href="https://pypi.org/project/pter">PyPI</a>.</p>'''
 
 COLOR_PROJECT = 'project'
 COLOR_CONTEXT = 'context'
@@ -94,6 +106,7 @@ class SettingsStorage(Configuration):
     def save(self):
         if not self.has_changes or not self.accept_changes:
             return
+        common.CACHEDIR.mkdir(parents=True, exist_ok=True)
         with open(common.CACHEFILE, 'wt', encoding='utf-8') as fd:
             self.conf.write(fd)
         self.has_changes = False
@@ -119,6 +132,79 @@ class SettingsStorage(Configuration):
         if isinstance(value, bool):
             value = 'yes' if value else 'no'
         self.conf[group][key] = value
+
+
+class DecorationContext:
+    def __init__(self,
+                 human_friendly_dates,
+                 font,
+                 colors,
+                 attr_colors):
+        self.human_friendly_dates = human_friendly_dates
+        self.font = font
+        self.color = colors
+        self.attr_color = attr_colors
+        self.fontmetrics = QtGui.QFontMetrics(self.font)
+        self.fontmetrics = QtGui.QFontMetrics(self.font)
+        self.space_width = self.fontmetrics.boundingRect('x x').width() - \
+                           self.fontmetrics.boundingRect('xx').width()
+
+        for colorname in self.color.keys():
+            self.color[colorname] = QtGui.QColor(self.color[colorname])
+        if self.color.get(COLOR_NORMAL, None) is None:
+            self.color[COLOR_NORMAL] = QtGui.QColor('#000')
+        for colorname in self.attr_color.keys():
+            self.attr_color[colorname] = QtGui.QColor(self.attr_color[colorname])
+
+
+class DecoratedTask:
+    def __init__(self, context, task):
+        self.context = context
+        self._task = task
+        self.state_color = self.context.color[COLOR_NORMAL]
+        self.diffdays = None
+        self.words = []
+        self.rects = []
+        self.width = 0
+
+        self.rebuild()
+
+    def parse(self, line):
+        self._task.parse(line)
+        self.rebuild()
+
+    def rebuild(self):
+        self.state_color = self.context.color[COLOR_NORMAL]
+        if self._task.is_completed:
+            self.state_color = self.context.color.get(COLOR_DONE, None) \
+                               or self.state_color
+        self.diffdays = utils.task_due_in_days(self._task)
+        if self.diffdays is not None:
+            if self.diffdays > 0:
+                self.state_color = self.context.color.get(COLOR_OVERDUE, None) \
+                                   or self.state_color
+            if self.diffdays == 0:
+                self.state_color = self.context.color.get(COLOR_DUE_TODAY, None) \
+                                   or self.state_color
+
+        self.words = []
+        if self._task.description is not None:
+            for word in self._task.description.split(' '):
+                if ':' in word:
+                    name, value = word.split(':', 1)
+                    if name in [common.TF_DUE, common.TF_COMPLETED, common.TF_CREATED] and \
+                       len(self.context.human_friendly_dates.intersection({common.TF_ALL, name})) > 0:
+                        word = f"{name}:{utils.human_friendly_date(value)}"
+                self.words.append((word, self.context.fontmetrics.boundingRect(word)))
+        self.width = self.context.fontmetrics.boundingRect(' '.join([w[0] for w in self.words])).width()
+
+    def __str__(self):
+        return str(self._task)
+
+    def __getattr__(self, name):
+        if hasattr(self._task, name):
+            return getattr(self._task, name)
+        raise AttributeError(name)
 
 
 class TaskDataModel(QtCore.QAbstractTableModel):
@@ -153,13 +239,31 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         self.tracking_marker = utils.unquote(config.get(common.SETTING_GROUP_SYMBOLS,
                                                         common.SETTING_ICON_TRACKING))
         self.colors = parse_colors(config, common.SETTING_GROUP_GUICOLORS)
+        self.attr_colors = parse_colors(config, common.SETTING_GROUP_GUIHIGHLIGHT)
+        self.font = QtGui.QFont()
+        fontsize = config.get(common.SETTING_GROUP_GUI, common.SETTING_FONTSIZE, None)
+        if fontsize is not None and len(fontsize.strip()) > 0:
+            if fontsize.endswith('px'):
+                self.font.setPixelSize(int(fontsize[:-2]))
+            else:
+                if fontsize.endswith('pt'):
+                    fontsize = fontsize[:-2]
+                self.font.setPointSizeF(float(fontsize))
+        fontname = config.get(common.SETTING_GROUP_GUI, common.SETTING_FONT, None)
+        if fontname is not None and len(fontname.strip()) > 0:
+            self.font.setFamily(fontname)
+        self.dcontext = DecorationContext(self.human_friendly_dates,
+                                          self.font,
+                                          self.colors,
+                                          self.attr_colors)
         self.reload()
 
     def reload(self):
         self.beginResetModel()
         self._tasks = []
         for source in self.sources:
-            self._tasks += [task for task in source.tasks]
+            self._tasks += [DecoratedTask(self.dcontext, task)
+                            for task in source.tasks]
         self.endResetModel()
 
     def ensure_up_to_date(self, index):
@@ -168,10 +272,11 @@ class TaskDataModel(QtCore.QAbstractTableModel):
             self.beginResetModel()
             self._tasks = []
             for source in [s for s in self.sources if s is not task.todotxt]:
-                self._tasks += [other for other in source.tasks]
+                self._tasks += [DecoratedTask(self.dcontext, other) 
+                                for other in source.tasks]
             new_row_nr = None
             for that in task.todotxt.parse():
-                self._tasks.append(that)
+                self._tasks.append(DecoratedTask(self.dcontext, that))
                 if that.raw == task.raw:
                     new_row_nr = len(self._tasks) - 1
             self.endResetModel()
@@ -196,7 +301,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
     def add_task(self, task):
         count = len(self._tasks)
         self.beginInsertRows(self.createIndex(count-1, 0), count, count)
-        self._tasks.append(task)
+        self._tasks.append(DecoratedTask(self.dcontext, task))
         self.endInsertRows()
 
     def data(self, index, role):
@@ -206,18 +311,21 @@ class TaskDataModel(QtCore.QAbstractTableModel):
             return self.task(index).todotxt
         if role == SORT_ROLE:
             return utils.sort_fnc(self.task(index))
-
-        if index.column() == TaskDataModel.COLUMN_DESCRIPTION:
-            if role == Qt.DisplayRole:
-                return " "
-            if role in (Qt.ForegroundRole, Qt.BackgroundRole):
-                return QtGui.QBrush(Qt.transparent)
+        if role == Qt.FontRole:
+            return self.font
 
         if index.column() == TaskDataModel.COLUMN_DONE:
             if role == Qt.DisplayRole:
                 return self.done_marker[1 if self.task(index).is_completed else 0]
 
         task = self.task(index)
+
+        if index.column() == TaskDataModel.COLUMN_DESCRIPTION:
+            if role == Qt.DisplayRole:
+                return task.description
+            if role in (Qt.ForegroundRole, Qt.BackgroundRole):
+                return QtGui.QBrush(Qt.transparent)
+
 
         if index.column() == TaskDataModel.COLUMN_PRIORITY:
             if role == Qt.DisplayRole:
@@ -320,10 +428,6 @@ class TaskList(QtWidgets.QTreeView):
     def __init__(self, config, menu, parent):
         super().__init__(parent)
         self.config = config
-        self.human_friendly_dates = set(config.list(common.SETTING_GROUP_GENERAL,
-                                                    common.SETTING_HUMAN_DATES))
-        self.attr_highlight = parse_colors(config, common.SETTING_GROUP_GUIHIGHLIGHT)
-        self.color = parse_colors(config, common.SETTING_GROUP_GUICOLORS)
 
         self.setAllColumnsShowFocus(True)
         self.contextmenu = menu
@@ -331,6 +435,7 @@ class TaskList(QtWidgets.QTreeView):
 
     def setModel(self, model):
         super().setModel(model)
+
         if model is not None:
             mapping = {'description': TaskDataModel.COLUMN_DESCRIPTION,
                        'created': TaskDataModel.COLUMN_CREATED,
@@ -372,77 +477,56 @@ class TaskList(QtWidgets.QTreeView):
                 header.moveSection(header.visualIndex(column), position)
 
                 position += 1
-            model.modelReset.connect(self.updateLabels)
             model.modelReset.connect(model.invalidate)
             model.dataChanged.connect(lambda _0, _1, _2: model.invalidate())
-            model.dataChanged.connect(lambda _0, _1, _2: self.updateLabels())
             model.rowsInserted.connect(lambda _0, _1, _2: model.invalidate())
-            model.rowsInserted.connect(lambda _0, _1, _2: self.updateLabels())
 
     def get_selected_index(self):
         for index in self.selectedIndexes():
             return index
         return None
 
-    def updateLabels(self, *args, **kwargs):
-        model = self.model()
-        for row in range(model.rowCount(model.index(0, 0))):
-            index = model.index(row, TaskDataModel.COLUMN_DESCRIPTION)
-            task = index.data(TASK_ROLE)
-            if task is None:
-                continue
-            rawtext = html.escape(task.description)
-            words = []
-            task_state_color = self.color.get(COLOR_NORMAL, None)
-            if task.is_completed:
-                task_state_color = self.color.get(COLOR_DONE, None) or task_state_color
-            diffdays = utils.task_due_in_days(task)
-            if diffdays is not None:
-                if diffdays > 0:
-                    task_state_color = self.color.get(COLOR_OVERDUE, None) or task_state_color
-                if diffdays == 0:
-                    task_state_color = self.color.get(COLOR_DUE_TODAY, None) or task_state_color
-
-            for word in rawtext.split(" "):
-                color = None
-
-                if word.startswith('+'):
-                    color = self.color.get(COLOR_PROJECT, None)
-                elif word.startswith('@'):
-                    color = self.color.get(COLOR_CONTEXT, None)
-                elif ':' in word:
-                    name, value = word.split(':', 1)
-                    # TODO: handle https, http, ftp, mailto, etc.
-                    # colorize words
-                    if name in self.attr_highlight:
-                        color = self.attr_highlight[name]
-
-                    # humanize dates
-                    if name in [common.TF_DUE, common.TF_COMPLETED, common.TF_CREATED] and \
-                       len(self.human_friendly_dates.intersection({common.TF_ALL, name})) > 0:
-                        word = f"{name}:{utils.human_friendly_date(value)}"
-
-                if color is not None:
-                    words.append(f"<font color='{color}'>" + word + "</font>")
-                else:
-                    words.append(word)
-
-            text = " ".join(words)
-            if task_state_color is not None:
-                text = f"<font color='{task_state_color}'>" + \
-                        text + \
-                        "</font>"
-            if task.is_completed:
-                text = '<s>' + text + '</s>'
-            # TODO: this is inefficient, learn to use a delegate
-            label = QtWidgets.QLabel(text)
-            label.setTextFormat(Qt.RichText)
-            self.setIndexWidget(index, label)
-
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.RightButton:
             self.contextmenu.popup(event.globalPos())
+
+
+class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
+    def __init__(self, config, parent=None):
+        super().__init__(parent)
+        self.config = config
+
+    def paint(self, painter, option, index):
+        painter.save()
+        task = index.data(TASK_ROLE)
+        painter.setFont(task.context.font)
+        painter.setClipRect(option.rect)
+        baseline = option.rect.y() + task.context.fontmetrics.ascent()
+        cursor = option.rect.x()
+        for word, rect in task.words:
+            color = task.state_color
+            if len(word) > 1:
+                if word.startswith('+'):
+                    color = task.context.color.get(COLOR_PROJECT, None) or color
+                elif word.startswith('@'):
+                    color = task.context.color.get(COLOR_CONTEXT, None) or color
+                elif ':' in word:
+                    name, _ = word.lower().split(':', 1)
+                    color = task.context.attr_color.get(name, color)
+            painter.setPen(color)
+            painter.drawText(cursor, baseline, word)
+            cursor += rect.width() + task.context.space_width
+        if task.is_completed:
+            painter.setPen(task.state_color)
+            middle = option.rect.y() + task.context.fontmetrics.height()/2
+            painter.drawLine(option.rect.x(), middle,
+                             cursor-task.context.space_width, middle)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        task = index.data(TASK_ROLE)
+        return QtCore.QSize(task.width, task.context.fontmetrics.height())
 
 
 class DockWithSettings(QtWidgets.QDockWidget):
@@ -699,6 +783,7 @@ class MainWindow(QMainWindow):
         self.taskModel = TaskDataModel(config)
         self.proxyModel = TaskProxyModel(config, self.searcher)
         self.proxyModel.setSourceModel(self.taskModel)
+        self.descriptionDelegate = TaskDescriptionDelegate(config)
         self.editor = None
         self.creator = None
         self.searchDock = None
@@ -724,6 +809,8 @@ class MainWindow(QMainWindow):
         self.actionDelegate = QtWidgets.QAction(tr("Dele&gate task"), self)
 
         self.actionOpenManual = QtWidgets.QAction(tr("Open &manual"), self)
+        self.actionShowAbout = QtWidgets.QAction(tr("&About"), self)
+        self.actionShowAboutQt = QtWidgets.QAction(tr("About &Qt"), self)
 
         self.construct()
         self.show()
@@ -743,6 +830,7 @@ class MainWindow(QMainWindow):
         self.taskList.setRootIsDecorated(False)
         self.taskList.setSortingEnabled(True)
         self.taskList.setHeaderHidden(True)
+        self.taskList.setItemDelegateForColumn(TaskDataModel.COLUMN_DESCRIPTION, self.descriptionDelegate)
         horizontalLayout.addWidget(self.taskList)
         self.setCentralWidget(centralwidget)
         self.menubar = QtWidgets.QMenuBar(self)
@@ -770,6 +858,9 @@ class MainWindow(QMainWindow):
         self.editMenu.addAction(self.actionToggleDone)
         self.editMenu.addAction(self.actionToggleHidden)
         helpMenu.addAction(self.actionOpenManual)
+        helpMenu.addSeparator()
+        helpMenu.addAction(self.actionShowAbout)
+        helpMenu.addAction(self.actionShowAboutQt)
         self.menubar.addAction(self.programMenu.menuAction())
         self.menubar.addAction(self.editMenu.menuAction())
         self.menubar.addAction(searchMenu.menuAction())
@@ -812,6 +903,7 @@ class MainWindow(QMainWindow):
         self.savedSearchesDock.restore_at(self)
 
         self.actionFocusTasks.triggered.connect(self.taskList.setFocus)
+        self.actionShowAbout.triggered.connect(self.do_show_about)
 
     def update_completers(self, words):
         self.searchDock.update_completion(words)
@@ -825,7 +917,6 @@ class MainWindow(QMainWindow):
         self.settings.update(SETTING_GROUP_MAINWINDOW, SETTING_MR_SEARCH, text)
         self.searcher.parse()
         self.proxyModel.invalidate()
-        self.taskList.updateLabels()
 
     def start_editor(self, tm_index):
         if self.editor is None:
@@ -851,6 +942,7 @@ class MainWindow(QMainWindow):
 
         if sorted(self.creator.sources) != sorted(sources):
             self.creator.sources = sources
+        self.creator.sourceSelector.setVisible(len(sources) > 1)
         self.creator.editor.setFocus()
         self.creator.do_show()
 
@@ -943,6 +1035,11 @@ class MainWindow(QMainWindow):
         if ok and len(name.strip()) > 0:
             self.savedSearchesDock.add_search(name, self.searchDock.editor.text())
 
+    def do_show_about(self):
+        QtWidgets.QMessageBox.about(self,
+                                    tr("qpter"),
+                                    tr(ABOUT_DIALOG_TEXT).format(version=version.__version__))
+
 
 class Program:
     def __init__(self, config, sources):
@@ -960,6 +1057,13 @@ class Program:
         if self.delegate_action not in common.DELEGATE_ACTIONS:
             self.delegate_action = common.DELEGATE_ACTION_NONE
 
+        self.icon = QtGui.QIcon()
+        for size in [16, 32, 64]:
+            fn = f'qpter_{size}x{size}.png'
+            fullpath = ICON_PATH / fn
+            if fullpath.exists():
+                self.icon.addFile(str(fullpath), QtCore.QSize(size, size))
+
         self.window = MainWindow(config)
         self.window.actionOpen.triggered.connect(self.do_open_source)
         self.window.actionQuit.triggered.connect(self.do_quit)
@@ -970,6 +1074,9 @@ class Program:
         self.window.actionToggleHidden.triggered.connect(self.do_toggle_hidden)
         self.window.actionDelegate.triggered.connect(self.do_delegate)
         self.window.taskList.activated.connect(self.do_edit)
+
+        if len(self.icon.availableSizes()) > 0:
+            self.window.setWindowIcon(self.icon)
 
         if SETTING_GROUP_FILES in self.window.settings:
             group = self.window.settings[SETTING_GROUP_FILES]
@@ -1137,8 +1244,9 @@ class Program:
 
 def run_qtui(config, sources, args):
     app = QApplication([])
-    app.setApplicationName("pter")
+    app.setApplicationName("qpter")
     app.setApplicationVersion(version.__version__)
     p = Program(config, sources)
+    p.window.actionShowAboutQt.triggered.connect(app.aboutQt)
     return app.exec_()
 

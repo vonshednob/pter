@@ -5,6 +5,21 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.5
+### Added
+- font and font-size configuration option for the GUI
+- About dialog in qpter
+- .desktop files added to the extras directory
+- Select file to create tasks in (in pter)
+
+### Fixed
+- Use .cache location for settings of pter
+- pter and qpter used to highlight single `+` and `@` characters
+
+### Changed
+- curses is now optional (necessary on Windows)
+- qpter does not show the list of files if there is only one file available
+
 ## 1.0.4
 ### Added
 - Default colors for project and context in qpter
