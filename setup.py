@@ -51,6 +51,17 @@ def compile_documentation():
     return htmlfiles
 
 
+def collect_icons():
+    icons = []
+    dst = pathlib.Path('./pter/icons')
+
+    for fn in dst.iterdir():
+        if fn.is_file() and fn.suffix == '.png':
+            icons.append('icons/' + fn.name)
+
+    return icons
+
+
 setuptools.setup(
     name='pter',
     version=version.__version__,
@@ -63,7 +74,7 @@ setuptools.setup(
     entry_points={'console_scripts': ['pter=pter.main:run'],
                   'gui_scripts': ['qpter=pter.main:run']},
     packages=['pter'],
-    package_data={'pter': [] + compile_documentation()},
+    package_data={'pter': collect_icons() + compile_documentation()},
     install_requires=['pytodotxt>=1.0.3'],
     extras_require={'xdg': ['pyxdg']},
     python_requires='>=3.0',

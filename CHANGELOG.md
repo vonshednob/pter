@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.6
+### Fixed
+- Sometimes the task list would not update when adding a task
+- Added documentation and icons to the distribution files
+- Search is correct upon startup
+
+### Added
+- qpter detects file changes and reloads automatically
+
 ## 1.0.5
 ### Added
 - font and font-size configuration option for the GUI

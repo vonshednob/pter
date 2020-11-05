@@ -477,9 +477,12 @@ class TaskList(QtWidgets.QTreeView):
                 header.moveSection(header.visualIndex(column), position)
 
                 position += 1
-            model.modelReset.connect(model.invalidate)
-            model.dataChanged.connect(lambda _0, _1, _2: model.invalidate())
-            model.rowsInserted.connect(lambda _0, _1, _2: model.invalidate())
+            # model.modelReset.connect(model.invalidate)
+            # model.dataChanged.connect(lambda _0, _1, _2: model.invalidate())
+            # model.rowsInserted.connect(lambda _0, _1, _2: model.invalidate())
+
+    def do_model_invalidate(self, *args, **kwargs):
+        self.model().invalidate()
 
     def get_selected_index(self):
         for index in self.selectedIndexes():
@@ -791,6 +794,8 @@ class MainWindow(QMainWindow):
         self.completion = None
         self.editMenu = None
 
+        self.watcher = QtCore.QFileSystemWatcher(self)
+
         self.safe_save = self.config.bool(common.SETTING_GROUP_GENERAL,
                                           common.SETTING_SAFE_SAVE)
 
@@ -817,6 +822,8 @@ class MainWindow(QMainWindow):
         self.searchDock.editor.setText(self.settings.get(SETTING_GROUP_MAINWINDOW, SETTING_MR_SEARCH, ""))
 
         self.actionOpenManual.triggered.connect(utils.open_manual)
+
+        self.update_search(self.searchDock.editor.text())
 
         self.settings.accept_changes = True
 
@@ -1087,12 +1094,21 @@ class Program:
                     source.parse()
                     self.sources.append(source)
 
+        for source in self.sources:
+            self.window.watcher.addPath(str(source.filename))
+        self.expect_change = []
+        self.window.watcher.fileChanged.connect(self.source_changed)
+
         self.window.taskModel.dataChanged.connect(lambda _0, _1, _2:
                 self.update_completers())
         self.window.taskModel.modelReset.connect(lambda:
                 self.update_completers())
+        self.window.taskModel.dataChanged.connect(self.window.taskList.do_model_invalidate)
+        self.window.taskModel.modelReset.connect(self.window.taskList.do_model_invalidate)
+        self.window.taskModel.rowsInserted.connect(self.window.taskList.do_model_invalidate)
 
         self.update_sources()
+        self.window.taskList.do_model_invalidate()
 
     def update_completers(self):
         pass
@@ -1111,6 +1127,7 @@ class Program:
         if task is None:
             return
 
+        self.expect_change.append(task.data(TASK_ROLE).todotxt.filename)
         self.window.start_editor(task)
         self.update_completers()
 
@@ -1176,6 +1193,8 @@ class Program:
         # TODO: catch bad parsing
         source.parse()
 
+        self.window.watcher.addPath(str(filename))
+
         self.sources.append(source)
         if self.window.settings.accept_changes:
             self.window.settings.conf[SETTING_GROUP_FILES] = {}
@@ -1184,6 +1203,15 @@ class Program:
             self.window.settings.has_changes = True
 
         self.update_sources()
+
+    def source_changed(self, name):
+        if name in self.expect_change:
+            self.expect_change.remove(name)
+            return
+        for source in self.sources:
+            if str(source.filename) == name:
+                source.parse()
+        self.window.taskModel.reload()
 
     def do_delegate(self):
         if len(self.delegate_marker) == 0:
