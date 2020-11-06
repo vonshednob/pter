@@ -14,8 +14,8 @@ from pytodotxt import TodoTxt, Task, version
 
 from pter import common
 from pter import utils
+from pter import configuration
 from pter.searcher import Searcher, get_relative_date
-from pter.configuration import Configuration
 from pter.key import Key
 from pter.source import Source
 from pter.tr import tr
@@ -165,6 +165,8 @@ class Window:
                                                                 common.SETTING_CLEAR_CONTEXT)
                                if len(context) > 0]
         self.add_creation_date = conf.bool(common.SETTING_GROUP_GENERAL, common.SETTING_ADD_CREATED)
+        self.create_from_search = conf.bool(common.SETTING_GROUP_GENERAL, common.SETTING_CREATE_FROM_SEARCH)
+        self.auto_id = conf.bool(common.SETTING_GROUP_GENERAL, common.SETTING_AUTO_ID)
         self.protos = conf.list(common.SETTING_GROUP_GENERAL,
                                 common.SETTING_PROTOCOLS)
 
@@ -279,7 +281,10 @@ class Window:
                                self.conf.bool(common.SETTING_GROUP_GENERAL,
                                               common.SETTING_SEARCH_CASE_SENSITIVE),
                                self.conf.get(common.SETTING_GROUP_GENERAL,
-                                             common.SETTING_DEFAULT_THRESHOLD))
+                                             common.SETTING_DEFAULT_THRESHOLD),
+                               self.conf.bool(common.SETTING_GROUP_GENERAL,
+                                              common.SETTING_HIDE_SEQUENTIAL))
+        self.search.update_sources(self.sources)
         self.delegation_marker = self.conf.get(common.SETTING_GROUP_GENERAL,
                                                common.SETTING_DELEG_MARKER)
         self.delegation_action = self.conf.get(common.SETTING_GROUP_GENERAL,
@@ -1178,7 +1183,7 @@ class Window:
         self.update_tasks()
 
     def do_create_task(self):
-        source = self.sources[0]  # TODO: maybe this should be configurable
+        source = self.sources[0]
         y = curses.LINES//2 - 1
         frame = curses.newwin(3, curses.COLS-6, y, 3)
         frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
@@ -1192,8 +1197,13 @@ class Window:
         today = ''
         if self.add_creation_date:
             today = datetime.datetime.now().strftime(Task.DATE_FMT) + ' '
+        if self.create_from_search:
+            today += utils.create_from_search(self.search)
         text, source = self.read_text(y+1, 4, curses.COLS-8, today, select_source=frame)
         if text is not None:
+            if self.auto_id and not any([word.startswith('id:') for word in text.split(' ')]):
+                text += ' id:#'
+            text = utils.auto_task_id(self.sources, text)
             text = utils.dehumanize_dates(text)
         frame.erase()
         del panel
@@ -1205,6 +1215,8 @@ class Window:
             source.tasks.append(task)
             source.save(safe=self.safe_save)
             source.parse()
+            source.update_contexts_and_projects()
+            self.search.update_sources(self.sources)
             self.update_tasks()
         self.show_tasks()
 
@@ -1237,6 +1249,7 @@ class Window:
                 return
         text = self.read_text(y+1, 4, curses.COLS-8, str(task).strip())
         if text is not None:
+            text = utils.auto_task_id(self.sources, text)
             text = utils.dehumanize_dates(text)
         frame.erase()
         del frame
@@ -1245,6 +1258,8 @@ class Window:
             if task is not None:
                 task.parse(text)
                 source.save(safe=self.safe_save)
+                source.update_contexts_and_projects()
+                self.search.update_sources(self.sources)
             else:
                 self.status_bar.addstr(0, 0,
                                        tr("Not changed: task was modified in the background"),
@@ -1288,6 +1303,8 @@ class Window:
     def do_reload_tasks(self):
         for source in self.sources:
             source.parse()
+            source.update_contexts_and_projects()
+        self.search.update_sources(self.sources)
         self.update_tasks()
 
     def do_toggle_tracking(self):
@@ -1478,15 +1495,19 @@ class Window:
         self.do_refresh_screen()
 
 
-def run_cursesui(sources, conf):
+def run_cursesui(args):
     success = 0
+    sources = utils.open_sources(args)
     
     if len(sources) == 0:
         success = -1
         print(tr("To start pter you must provide at least one todo.txt file. See --help for more information."),
               file=sys.stderr)
     else:
-        window = Window(sources, Configuration(conf))
+        search = Searcher('', False)
+        search.update_sources(sources)
+
+        window = Window(sources, configuration.get_config(args))
         exception = None
 
         try:

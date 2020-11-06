@@ -10,8 +10,8 @@ Synopsis
 
 ::
 
-  pter [-h] [-c configuration] filename [filename ...]
-  qpter [-h] [-c configuration] filename [filename ...]
+  pter [-h] [-v] [-u] [-c configuration] filename [filename ...]
+  qpter [-h] [-v] [-u] [-a] [-c configuration] filename [filename ...]
 
 
 Description
@@ -29,6 +29,8 @@ pter offers these features:
  - Convenient entering of dates (see `Relative Dates`_)
  - Configurable behaviour, shortcuts, and colors (see `Files`_)
  - Time tracking
+ - Automatic identifiers (see `Unique Task Identifiers`_)
+ - Task sequencing (see `Task Sequences`_)
 
 qpter is the Qt version of pter (ie. pter with a graphical user interface)
 and supports mostly the same features but sometimes looks for other
@@ -45,6 +47,18 @@ Options
 
   ``-h``
     Show the help.
+
+  ``-v``
+    Show the version of pter/qpter.
+
+  ``-u``
+    Check whether a new version of pter is available on pypi (requires an
+    internet connection).
+
+  ``-a``
+    Only available for qpter: either start qpter, immediately open the New
+    Task panel. Or, if qpter is running already, bring it to the foreground
+    and open the New Task panel.
 
   ``filename``
     Path to your todo.txt file. The first file that you provide is the one
@@ -159,6 +173,20 @@ General
   ``add-creation-date``
     Whether or not to automatically always add the creation date of a task
     to it when creating the task. Defaults to ``yes``.
+
+  ``create-from-search``
+    If set to ``yes``, positive expressions (that do not refer to time or
+    `done`) of the active search (eg. `@context +project word`, but not
+    `-@context due:+7d done:y -others`) will be added automatically to a
+    newly created task. Defaults to ``no``.
+
+  ``auto-id``
+    Whether or not to automatically add an ID to newly created tasks.
+    Defaults to ``no``.
+
+  ``hide-sequential``
+    Whether or not to automatically hide tasks that have uncompleted
+    preceding tasks (see `Task Sequences`_). Defaults to ``yes``.
 
 
 Symbols
@@ -290,6 +318,14 @@ Available function names are:
  - ``open-manual``, open this manual
  - ``open-file``, open an additional todo.txt,
  - ``new``, open the editor to create a new task,
+ - ``new-related``, open the editor to create a new task that is
+   automatically related (has a ``ref:`` attribute) to the
+   currently selected task. If the currently selected task does not have an
+   ``id:`` yet, it will be given one automatically
+ - ``new-subsequent``, open the editor to create a new task that is
+   following the currently selected task (has an ``after:`` attribute).
+   If the currently selected task does not have an ``id:`` yet, it will
+   be given one automatically.
  - ``edit``, opens the editor for the selected task,
  - ``toggle-done``, toggles the completion of a task,
  - ``toggle-tracking``, toggle the 'tracking' attribute of the selected task,
@@ -359,7 +395,8 @@ The GUI has a somewhat different coloring scheme. The available colors are:
  - ``tracking``, color for tasks that are currently being tracked,
  - ``pri-a``, color for the priority A,
  - ``pri-b``, color for the priority b,
- - ``pri-c``, color for the priority c
+ - ``pri-c``, color for the priority C,
+ - ``url``, color for clickable URLs (see ``protocols`` in `General`_)
 
 
 Highlight
@@ -479,6 +516,16 @@ The GUI specific options are defined in the ``[GUI]`` section:
     The font size to use for the task list. You can specify the size either
     in pixel (eg. ``12px``) or point size (eg. ``14pt``). Unlike pixel
     sizes, point sizes may be a non-integer number, eg. ``16.8pt``. 
+
+  ``single-instance``
+    Whether or not qpter may only be started once.
+
+  ``clickable``
+    If enabled, this allows you to click on URLs (see option ``protocols``
+    in `General`_) to open them in a webbrowser, and to click on contexts
+    and projects to add them to the current search. Disabling this option
+    may improve performance. The default is ``yes``, ie. URLs, contexts,
+    and projects are clickable.
 
 
 Keyboard controls
@@ -722,6 +769,42 @@ see what tasks become available then by searching for ``threshold:2042-02-14``.
 Searching for ``threshold`` supports `Relative Dates`_.
 
 
+Task Identifier
+---------------
+
+You can search for task IDs with ``id:``. If you search for multiple
+task IDs, all of these are searched for, not a task that has all given IDs.
+
+You can also exclude tasks by ID from a search with ``not:id:`` or
+``-id:``.
+
+
+Sequence
+--------
+
+You can search for tasks that are supposed to follow directly or indirectly
+other tasks by searching for ``after:taskid`` (``taskid`` should be the
+``id`` of a task). Any task that is supposed to be completed after that
+task, will be found.
+
+If the configuration option ``hide-sequential`` is set to ``yes`` (the
+default), tasks are hidden that have uncompleted preceding tasks (see
+`General`_).
+
+If you want to see all tasks, disregarding their declared sequence, you can
+search for ``after:`` (without anything after the ``:``).
+
+
+Task References
+---------------
+
+Tasks that refer to other tasks by any of the existing means (eg. ``ref:``
+or ``after:``) can be found by searching for ``ref:``.
+
+If you search using multiple references (eg. ``ref:4,5`` or ``ref:4
+ref:5``) the task IDs are considered a logical ``or``.
+
+
 Named Searches
 ==============
 
@@ -778,6 +861,73 @@ the configuration file to ``mail-to``. In that case an attempt is made to
 open your email program and start a new email. In case you defined a
 ``to:`` (configurable by defining ``delegation-to``) in your task
 description, that will be used as the recipient for the email.
+
+
+Unique Task Identifiers
+=======================
+
+Tasks can be given an identifier with the ``id:`` attribute. pter can
+support you in creating unique IDs by creating a task with ``id:#auto`` or,
+shorter, ``id:#``.
+
+If you would like to group your tasks IDs, you can provide a prefix to the
+id::
+
+  Clean up the +garage id:clean3
+
+If you now create a task with ``id:clean#`` or ``id:clean#auto``, the next
+task will be given ``id:clean4``.
+
+In case you want all your tasks to be created with a unique ID, have a look
+at the configuration option ``auto-id`` (in section `General`_).
+
+You can refer to other tasks using the attribute ``ref:`` following the id
+of the task that you are referring to. This may also be a comma separated
+list of tasks (much like ``after:``, see `Task Sequences`_).
+
+
+Task Sequences
+==============
+
+You can declare that a task is supposed to be done after another task has
+been completed by setting the ``after:`` attribute to the preceding task.
+
+By default, ie. with an empty search, any task that is declared to be
+``after:`` some other preceding task will not be shown unless the preceding
+task has been marked as done.
+
+If you do not like this feature, you can disable it in the
+``hide-sequential`` in the configuration file (see `General`_).
+
+
+Examples
+--------
+
+These three tasks may exist::
+
+  Buy potatoes @market id:1
+  Make fries @kitchen id:2 after:1
+  Eat fries for dinner after:2
+
+This means that ``Make fries`` won’t show in the list of tasks until ``Buy
+potatoes`` has been completed. Similarily ``Eat fries for dinner`` will not
+show up until ``Make fries`` has been completed.
+
+You can declare multiple ``after:`` attributes, or comma separate multiple
+prerequisites to indicate that *all* preceding tasks must be completed
+before a task may be shown::
+
+  Buy oil id:1
+  Buy potatoes id:2
+  Buy plates id:3
+  Make fries id:4 after:1,2
+  Eat fries after:3 after:4
+
+In this case ``Make fries`` will not show up until both ``Buy oil`` and
+``Buy potatoes`` has been completed.
+
+Similarly ``Eat fries`` requires both tasks, ``Make fries`` and ``Buy
+plates``, to be completed.
 
 
 Getting Things Done

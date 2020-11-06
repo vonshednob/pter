@@ -10,6 +10,7 @@ except ImportError:
 
 
 PROGRAMNAME = 'pter'
+QTPROGRAMNAME = 'qpter'
 HERE = pathlib.Path(os.path.abspath(__file__)).parent
 HOME = pathlib.Path.home()
 CONFIGDIR = HOME / ".config" / PROGRAMNAME
@@ -64,6 +65,11 @@ SETTING_TASK_FORMAT = 'task-format'
 SETTING_CLEAR_CONTEXT = 'clear-context'
 SETTING_FONT = 'font'
 SETTING_FONTSIZE = 'font-size'
+SETTING_SINGLE_INSTANCE = 'single-instance'
+SETTING_CREATE_FROM_SEARCH = 'create-from-search'
+SETTING_AUTO_ID = 'auto-id'
+SETTING_HIDE_SEQUENTIAL = 'hide-sequential'
+SETTING_CLICKABLE = 'clickable'
 SETTING_ICON_SELECTION = 'selection'
 SETTING_ICON_NOT_DONE = 'not-done'
 SETTING_ICON_DONE = 'done'
@@ -88,8 +94,11 @@ SETTING_COL_OVERDUE = 'overdue'
 SETTING_COL_DUE_TODAY = 'due-today'
 SETTING_COL_DUE_TOMORROW = 'due-tomorrow'
 SETTING_COL_TRACKING = 'tracking'
+SETTING_COL_URL = 'url'
 SETTING_GK_QUIT = 'quit'
 SETTING_GK_NEW = 'new'
+SETTING_GK_NEW_REF = 'new-related'
+SETTING_GK_NEW_AFTER = 'new-subsequent'
 SETTING_GK_EDIT = 'edit'
 SETTING_GK_OPEN_FILE = 'open-file'
 SETTING_GK_TOGGLE_DONE = 'toggle-done'

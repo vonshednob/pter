@@ -2,12 +2,17 @@ import datetime
 import string
 import re
 import webbrowser
+import pathlib
 import urllib.parse
+import subprocess
+import sys
 import os
 
-from pter.searcher import get_relative_date
+from pytodotxt import Task, TodoTxt
+
 from pter import common
-from pytodotxt import Task
+from pter.searcher import get_relative_date
+from pter.source import Source
 
 
 DATETIME_FMT = '%Y-%m-%d-%H-%M-%S'
@@ -148,7 +153,7 @@ def toggle_done(task, clear_contexts):
         if 'pri' in attrs:
             task.priority = attrs['pri'][0]
             task.remove_attribute('pri')
-    task.raw = str(task)
+    task.parse(str(task))
 
 
 def toggle_hidden(task):
@@ -412,12 +417,57 @@ def new_task_id(sources, prefix=""):
     """
     existing_ids = set()
     for source in sources:
-        existing_ids |= {key for key in source.task_ids if key.startswith(prefix) and key[len(prefix):].isnumeric()}
+        existing_ids |= {int(key[len(prefix):]) for key in source.task_ids
+                         if key.startswith(prefix) and key[len(prefix):].isnumeric()}
 
     if len(existing_ids) > 0:
-        highest = int(max(existing_ids)[len(prefix):])
+        highest = max(existing_ids)
     else:
         highest = 0
 
     return prefix + str(highest+1)
+
+
+def query_latest_version():
+    installed_re = re.compile(r'^[\s]+IN_STALLED:[\s]+([^\s]+)(.*)$')
+    latest_re = re.compile(r'^[\s]+LATEST:[\s]+([^\s]+)$')
+    output = subprocess.run([sys.executable, "-m", "pip", "search", common.PROGRAMNAME], capture_output=True)
+    for line in str(output.stdout, 'utf-8').split("\n"):
+        match = installed_re.match(line)
+        if match is not None:
+            if len(match.groups()) > 1:
+                return match.group(1)
+        match = latest_re.match(line)
+        if match is not None:
+            return match.group(1)
+
+    return ''
+
+
+def open_sources(args):
+    sources = [Source(TodoTxt(pathlib.Path(fn).expanduser().resolve())) for fn in args.filename]
+    for source in sources:
+        if source.filename.exists():
+            source.parse()
+    return sources
+
+
+def create_from_search(searcher):
+    text = []
+    for group, prefix in [('contexts', '@'), ('projects', '+'), ('words', '')]:
+        text += [prefix+word for word in getattr(searcher, group, set())]
+    return ' '.join(text)
+
+
+def auto_task_id(sources, text):
+    words = []
+    for word in text.split(' '):
+        if word.startswith('id:'):
+            _, base = word.split(':', 1)
+            if '#' in base:
+                base, keyword = base.split('#', 1)
+                if keyword == '' or keyword == 'auto':
+                    word = 'id:{}'.format(new_task_id(sources, base))
+        words.append(word)
+    return ' '.join(words)
 

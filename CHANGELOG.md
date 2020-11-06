@@ -5,6 +5,28 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.7
+### Added
+- qpter can be run with -a/--add-task to activate the running qpter and create
+  a new task
+- -v/--version command line option to show pter's version
+- -u/--check-for-updates command line option to check at pypi whether a new
+  software version is available
+- Support for `id:` attributes (automatic ID creation with `id:#auto`)
+- `auto-id` configuration option
+- Support for `after:` attribute (`hide-sequential` configuration option)
+- Optionally clickable URLs, contexts, and projects (`clickable`)
+- Optionally allow multiple instances of qpter (option `single-instance`)
+- Support for `ref:` searches
+- "New related task" and "New subsequent task" in qpter
+
+### Fixed
+- Coloring for due today/tomorrow and overdue corrected
+- Don't color as overdue when task is completed
+- Color also the checkmark in the 'done' color
+- Refreshing task list in qpter was shaky
+
+
 ## 1.0.6
 ### Fixed
 - Sometimes the task list would not update when adding a task
@@ -13,6 +35,7 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 
 ### Added
 - qpter detects file changes and reloads automatically
+
 
 ## 1.0.5
 ### Added
@@ -29,6 +52,7 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 - curses is now optional (necessary on Windows)
 - qpter does not show the list of files if there is only one file available
 
+
 ## 1.0.4
 ### Added
 - Default colors for project and context in qpter
@@ -39,6 +63,7 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 ### Fixed
 - Bugfix: Starting qpter for the first time fails with ValueError exception
 - Bugfix: Mixed up GUI:Highlight and GUI:Colors
+
 
 ## 1.0.3
 ### Changed
@@ -52,12 +77,14 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 - GUI:Highlight configuration group
 - add-creation-date configuration option in General
 
+
 ## 1.0.2
 ### Added
 - Delegate functionality
 
 ### Bugfix
 - Fixed a crash when a task consists only of a date (issue [#25](https://git.spacepanda.se/bold-kitty/pter/issues/25))
+
 
 ## 1.0.1
 ### Added
@@ -66,6 +93,7 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 
 ### Fixed
 - Editing a task after marking it as done, keeps it marked as done ([#24](https://git.spacepanda.se/bold-kitty/pter/issues/24))
+
 
 ## 1.0.0
 ### Added
@@ -82,8 +110,10 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 ### Breaking
 - Named searches are stored in `searches.txt`, not `searches.cfg`
 
+
 ## 0.2.0
 Split off into its own project called `pter`.
+
 
 ## 0.1.10
 ### Added
@@ -97,20 +127,24 @@ Split off into its own project called `pter`.
 - Accept unicode characters in input fields
 - Custom coloring of key:value attributes
 
+
 ## 0.1.9
 ### Added
 - Safe save behaviour is now configurable in pytodoterm
 - Load Search and Save Search is shown in the help in pytodoterm
 - Searching for relative dates in pytodoterm
 
+
 ## 0.1.8
 ### Fixed
 - Handle backspace in xterm-like terminals (pytodoterm)
 - Show an empty task list if the no tasks match the search query (pytodoterm)
 
+
 ## 0.1.7
 ### Fixed
 - Flicker prevention (pytodoterm)
+
 
 ## 0.1.6
 ### Added

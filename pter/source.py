@@ -29,7 +29,7 @@ class Source:
     def update_contexts_and_projects(self):
         self._projects = set()
         self._contexts = set()
-        self_task_by_id = {}
+        self._task_by_id = {}
         for task in self.source.tasks:
             self.update_from_task(task)
 

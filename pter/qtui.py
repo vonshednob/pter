@@ -3,21 +3,24 @@ import html
 import re
 import configparser
 import pathlib
+import getpass
+import sys
+import webbrowser
 
 from pytodotxt import Task, TodoTxt
 
 import PyQt5
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtCore, QtGui, QtNetwork
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtCore import Qt
 
 from pter import common
 from pter import utils
 from pter import version
+from pter import configuration
 from pter.source import Source
 from pter.searcher import Searcher
 from pter.tr import tr
-from pter.configuration import Configuration
 
 
 HEX_COLOR = re.compile(r'^#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F])?$')
@@ -29,12 +32,12 @@ SORT_ROLE = Qt.UserRole + 3
 
 ICON_PATH = common.HERE / "icons"
 
-ABOUT_DIALOG_TEXT = '''<h1>About qpter</h1>
+ABOUT_DIALOG_TEXT = '''<h1>About {qtprogramname}</h1>
 <h2>Personal Task Entropy Reducer</h2>
-<p>qpter is the Qt user interface to pter.</p>
+<p>{qtprogramname} is the Qt user interface to {programname}.</p>
 <p>This is version {version}.</p>
 <h2>License</h2>
-<p>pter is open source software and licensed under MIT License. You
+<p>{programname} is open source software and licensed under MIT License. You
 can obtain the source code from <a href="https://github.com/vonshednob/pter">GitHub</a>
 or <a href="https://pypi.org/project/pter">PyPI</a>.</p>'''
 
@@ -84,7 +87,7 @@ def parse_colors(config, section):
     return result
 
 
-class SettingsStorage(Configuration):
+class SettingsStorage(configuration.Configuration):
     def __init__(self):
         super().__init__(None)
         try:
@@ -146,8 +149,8 @@ class DecorationContext:
         self.attr_color = attr_colors
         self.fontmetrics = QtGui.QFontMetrics(self.font)
         self.fontmetrics = QtGui.QFontMetrics(self.font)
-        self.space_width = self.fontmetrics.boundingRect('x x').width() - \
-                           self.fontmetrics.boundingRect('xx').width()
+        self.space_width = self.fontmetrics.boundingRect('m w').width() - \
+                           self.fontmetrics.boundingRect('mw').width()
 
         for colorname in self.color.keys():
             self.color[colorname] = QtGui.QColor(self.color[colorname])
@@ -163,6 +166,7 @@ class DecoratedTask:
         self._task = task
         self.state_color = self.context.color[COLOR_NORMAL]
         self.diffdays = None
+        self.age = None
         self.words = []
         self.rects = []
         self.width = 0
@@ -175,17 +179,25 @@ class DecoratedTask:
 
     def rebuild(self):
         self.state_color = self.context.color[COLOR_NORMAL]
+        self.diffdays = None
+        self.age = None
+        if self.creation_date is not None:
+            self.age = (datetime.date.today() - self.creation_date).days
         if self._task.is_completed:
             self.state_color = self.context.color.get(COLOR_DONE, None) \
                                or self.state_color
-        self.diffdays = utils.task_due_in_days(self._task)
-        if self.diffdays is not None:
-            if self.diffdays > 0:
-                self.state_color = self.context.color.get(COLOR_OVERDUE, None) \
-                                   or self.state_color
-            if self.diffdays == 0:
-                self.state_color = self.context.color.get(COLOR_DUE_TODAY, None) \
-                                   or self.state_color
+        else:
+            self.diffdays = utils.task_due_in_days(self._task)
+            if self.diffdays is not None:
+                if self.diffdays < 0:
+                    self.state_color = self.context.color.get(COLOR_OVERDUE, None) \
+                                       or self.state_color
+                if self.diffdays == 0:
+                    self.state_color = self.context.color.get(COLOR_DUE_TODAY, None) \
+                                       or self.state_color
+                if self.diffdays == 1:
+                    self.state_color = self.context.color.get(COLOR_DUE_TOMORROW, None) \
+                                       or self.state_color
 
         self.words = []
         if self._task.description is not None:
@@ -205,6 +217,70 @@ class DecoratedTask:
         if hasattr(self._task, name):
             return getattr(self._task, name)
         raise AttributeError(name)
+
+    @property
+    def description(self):
+        return self._task.description
+
+    @description.setter
+    def description(self, value):
+        self._task.description = value
+
+    @property
+    def is_completed(self):
+        return self._task.is_completed
+
+    @is_completed.setter
+    def is_completed(self, value):
+        self._task.is_completed = value
+
+    @property
+    def priority(self):
+        return self._task.priority
+
+    @priority.setter
+    def priority(self, value):
+        self._task.priority = value
+
+    @property
+    def completion_date(self):
+        return self._task.completion_date
+
+    @completion_date.setter
+    def completion_date(self, value):
+        self._task.completion_date = value
+
+    @property
+    def creation_date(self):
+        return self._task.creation_date
+
+    @creation_date.setter
+    def creation_date(self, value):
+        self._task.creation_date = value
+
+    @property
+    def linenr(self):
+        return self._task.linenr
+
+    @linenr.setter
+    def linenr(self, value):
+        self._task.linenr = value
+
+    @property
+    def raw(self):
+        return self._task.raw
+
+    @raw.setter
+    def raw(self, value):
+        self._task.raw = value
+
+    @property
+    def todotxt(self):
+        return self._task.todotxt
+
+    @todotxt.setter
+    def todotxt(self, value):
+        self._task.todotxt = value
 
 
 class TaskDataModel(QtCore.QAbstractTableModel):
@@ -293,9 +369,8 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         return self._tasks[index.row()]
 
     def setData(self, index, value, role=Qt.EditRole):
-        index.data(TASK_ROLE).parse(str(value))
-        self.dataChanged.emit(index.siblingAtRow(TaskDataModel.COLUMN_DONE),
-                              index.siblingAtRow(TaskDataModel.COLUMN_IS_TRACKING))
+        # index.data(TASK_ROLE).parse(str(value))
+        self.dataChanged.emit(index, index)
         return True
 
     def add_task(self, task):
@@ -363,37 +438,35 @@ class TaskDataModel(QtCore.QAbstractTableModel):
                 return self.tracking_marker if is_tracking else ""
         if role == Qt.ForegroundRole and len(task.attr_tracking) > 0:
             color = self.colors.get(COLOR_TRACKING, None)
-            if color:
+            if color is not None:
                 return QtGui.QColor(color)
 
-        due = None
-        today = datetime.date.today()
-        if len(task.attr_due) > 0:
-            try:
-                due = datetime.datetime.strptime(task.attr_due[0], Task.DATE_FMT).date()
-            except ValueError:
-                due = None
-
-        if index.column() == TaskDataModel.COLUMN_DUE and due is not None and role == Qt.DisplayRole:
+        if index.column() == TaskDataModel.COLUMN_DUE and \
+           task.diffdays is not None and \
+           not task.is_completed and \
+           role == Qt.DisplayRole:
             value = ""
-            if due < today:
+            if task.diffdays < 0:
                 return self.due_marker[0]
-            if due == today:
+            if task.diffdays == 0:
                 return self.due_marker[1]
-            if due == today + datetime.timedelta(days=1):
+            if task.diffdays == 1:
                 return self.due_marker[2]
             return ""
 
-        if index.column() == TaskDataModel.COLUMN_DUE_IN_DAYS and due is not None and role == Qt.DisplayRole:
-            return (due - datetime.date.today()).days
+        if index.column() == TaskDataModel.COLUMN_DUE_IN_DAYS and task.diffdays is not None and role == Qt.DisplayRole:
+            return task.diffdays
 
-        if due is not None and role == Qt.ForegroundRole:
-            if due < today:
-                return QtGui.QColor(self.colors.get(COLOR_OVERDUE, None))
-            if due == today:
-                return QtGui.QColor(self.colors.get(COLOR_DUE_TODAY, None))
-            if due == today + datetime.timedelta(days=1):
-                return QtGui.QColor(self.colors.get(COLOR_DUE_TOMORROW, None))
+        if task.diffdays is not None and not task.is_completed and role == Qt.ForegroundRole:
+            if task.diffdays < 0:
+                return QtGui.QColor(self.colors.get(COLOR_OVERDUE, None) or task.state_color)
+            if task.diffdays == 0:
+                return QtGui.QColor(self.colors.get(COLOR_DUE_TODAY, None) or task.state_color)
+            if task.diffdays == 1:
+                return QtGui.QColor(self.colors.get(COLOR_DUE_TOMORROW, None) or task.state_color)
+
+        if role == Qt.ForegroundRole:
+            return task.state_color
 
         return None
 
@@ -425,13 +498,21 @@ class TaskProxyModel(QtCore.QSortFilterProxyModel):
 
 
 class TaskList(QtWidgets.QTreeView):
+    wordClicked = QtCore.pyqtSignal(str)
+
     def __init__(self, config, menu, parent):
         super().__init__(parent)
         self.config = config
+        self.clickable_protocols = config.list(common.SETTING_GROUP_GENERAL,
+                                               common.SETTING_PROTOCOLS)
 
         self.setAllColumnsShowFocus(True)
         self.contextmenu = menu
         self.header().setSectionsMovable(True)
+        self.clickable = config.bool(common.SETTING_GROUP_GUI,
+                                     common.SETTING_CLICKABLE)
+        self.mouse_down = None
+        self.setMouseTracking(self.clickable)
 
     def setModel(self, model):
         super().setModel(model)
@@ -477,28 +558,90 @@ class TaskList(QtWidgets.QTreeView):
                 header.moveSection(header.visualIndex(column), position)
 
                 position += 1
-            # model.modelReset.connect(model.invalidate)
-            # model.dataChanged.connect(lambda _0, _1, _2: model.invalidate())
-            # model.rowsInserted.connect(lambda _0, _1, _2: model.invalidate())
-
-    def do_model_invalidate(self, *args, **kwargs):
-        self.model().invalidate()
 
     def get_selected_index(self):
         for index in self.selectedIndexes():
             return index
         return None
 
+    def handle_on_click(self, task, word):
+        if word.startswith('@'):
+            self.wordClicked.emit(word)
+        elif word.startswith('+'):
+            self.wordClicked.emit(word)
+        else:
+            if word.startswith('uri:') or word.startswith('url:'):
+                word = word[4:]
+            elif word.startswith('<') and word.endswith('>'):
+                word = word[1:-1]
+
+            if ':' in word:
+                proto, url = word.split(':', 1)
+                if proto in self.clickable_protocols and len(url) > 0:
+                    webbrowser.open(word)
+
+    def handle_mouse_over(self, task, word):
+        if word.startswith('@'):
+            return Qt.PointingHandCursor
+        elif word.startswith('+'):
+            return Qt.PointingHandCursor
+        else:
+            if word.startswith('uri:') or word.startswith('url:'):
+                word = word[4:]
+            elif word.startswith('<') and word.endswith('>'):
+                word = word[1:-1]
+
+            if ':' in word:
+                proto, url = word.split(':', 1)
+                if proto in self.clickable_protocols and len(url) > 0:
+                    return Qt.PointingHandCursor
+        return Qt.ArrowCursor
+
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() == Qt.RightButton:
             self.contextmenu.popup(event.globalPos())
+        if event.button() == Qt.LeftButton and self.clickable:
+            self.mouse_down = None
+            index = self.indexAt(event.pos())
+            if index is not None:
+                task = index.data(TASK_ROLE)
+                if task is not None and len(task.rects) > 0:
+                    for rect, word in task.rects:
+                        if rect.contains(event.pos()):
+                            self.mouse_down = (task, word, rect)
+                            break
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        if self.clickable and self.mouse_down is not None and event.button() == Qt.LeftButton:
+            task, word, rect = self.mouse_down
+            if rect.contains(event.pos()):
+                self.handle_on_click(task, word)
+            self.mouse_down = None
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self.clickable:
+            index = self.indexAt(event.pos())
+            cursor = Qt.ArrowCursor
+            if index is not None:
+                task = index.data(TASK_ROLE)
+                if task is not None and len(task.rects) > 0:
+                    for rect, word in task.rects:
+                        if rect.contains(event.pos()):
+                            cursor = self.handle_mouse_over(task, word)
+                            break
+            if self.cursor() != cursor:
+                self.setCursor(cursor)
 
 
 class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
     def __init__(self, config, parent=None):
         super().__init__(parent)
         self.config = config
+        self.clickable_protocols = config.list(common.SETTING_GROUP_GENERAL,
+                                               common.SETTING_PROTOCOLS)
 
     def paint(self, painter, option, index):
         painter.save()
@@ -507,17 +650,34 @@ class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
         painter.setClipRect(option.rect)
         baseline = option.rect.y() + task.context.fontmetrics.ascent()
         cursor = option.rect.x()
+        task.rects = []
         for word, rect in task.words:
             color = task.state_color
+            clickable = False
             if len(word) > 1:
                 if word.startswith('+'):
                     color = task.context.color.get(COLOR_PROJECT, None) or color
+                    clickable = True
                 elif word.startswith('@'):
                     color = task.context.color.get(COLOR_CONTEXT, None) or color
+                    clickable = True
+                elif word.startswith('<') and word.endswith('>'):
+                    color = task.context.color.get(common.SETTING_COL_URL, None) or color
+                    clickable = True
                 elif ':' in word:
                     name, _ = word.lower().split(':', 1)
-                    color = task.context.attr_color.get(name, color)
+                    color = task.context.attr_color.get(name, None)
+
+                    clickable = name in self.clickable_protocols
+                    if clickable and color is None:
+                        color = task.context.color.get(common.SETTING_COL_URL, None)
+                    color = color or task.state_color
             painter.setPen(color)
+            if clickable:
+                task.rects.append((QtCore.QRect(cursor, option.rect.y(), rect.width(), rect.height()),
+                                   word))
+                # for debugging clickable areas:
+                # painter.drawRect(task.rects[-1][0])
             painter.drawText(cursor, baseline, word)
             cursor += rect.width() + task.context.space_width
         if task.is_completed:
@@ -645,7 +805,6 @@ class DockSavedSearches(DockWithSettings):
         utils.save_searches(self.searches)
 
 
-
 class DockTaskEditor(QtWidgets.QDockWidget):
     def __init__(self, settings, title, parent=None):
         super().__init__(title, parent)
@@ -740,7 +899,8 @@ class DockTaskCreator(DockWithSettings):
         self.cancelButton.clicked.connect(self.do_cancel)
 
     def do_cancel(self):
-        self.mr_source = self.sources[self.sourceSelector.currentIndex()].filename
+        if len(self.sources) > 0:
+            self.mr_source = self.sources[self.sourceSelector.currentIndex()].filename
         self.chkCreationDate.setChecked(self.add_creation_date)
         self.editor.setText("")
         self.hide()
@@ -772,9 +932,10 @@ class DockTaskCreator(DockWithSettings):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, config):
+    def __init__(self, config, pidfile, sources):
         super().__init__()
         self.config = config
+        self.pidfile = pidfile
         self.settings = SettingsStorage()
         self.menubar = None
         self.taskList = None
@@ -782,7 +943,9 @@ class MainWindow(QMainWindow):
                                  self.config.bool(common.SETTING_GROUP_GENERAL,
                                                   common.SETTING_SEARCH_CASE_SENSITIVE),
                                  self.config.get(common.SETTING_GROUP_GENERAL,
-                                                 common.SETTING_DEFAULT_THRESHOLD))
+                                                 common.SETTING_DEFAULT_THRESHOLD),
+                                 self.config.bool(common.SETTING_GROUP_GENERAL,
+                                                  common.SETTING_HIDE_SEQUENTIAL))
         self.taskModel = TaskDataModel(config)
         self.proxyModel = TaskProxyModel(config, self.searcher)
         self.proxyModel.setSourceModel(self.taskModel)
@@ -793,11 +956,16 @@ class MainWindow(QMainWindow):
         self.savedSearchesDock = None
         self.completion = None
         self.editMenu = None
+        self.sources = sources
 
         self.watcher = QtCore.QFileSystemWatcher(self)
 
         self.safe_save = self.config.bool(common.SETTING_GROUP_GENERAL,
                                           common.SETTING_SAFE_SAVE)
+        self.create_from_search = self.config.bool(common.SETTING_GROUP_GENERAL,
+                                                   common.SETTING_CREATE_FROM_SEARCH)
+        self.auto_id = self.config.bool(common.SETTING_GROUP_GENERAL,
+                                        common.SETTING_AUTO_ID)
 
         self.actionOpen = QtWidgets.QAction(tr("&Open…"), self)
         self.actionQuit = QtWidgets.QAction(tr("&Quit"), self)
@@ -812,6 +980,8 @@ class MainWindow(QMainWindow):
         self.actionToggleHidden = QtWidgets.QAction(tr("Toggle &hidden"), self)
         self.actionFocusTasks = QtWidgets.QAction(tr("Focus &tasks"), self)
         self.actionDelegate = QtWidgets.QAction(tr("Dele&gate task"), self)
+        self.actionNewRefTask = QtWidgets.QAction(tr("New &related task"), self)
+        self.actionNewAfterTask = QtWidgets.QAction(tr("New &subsequent task"), self)
 
         self.actionOpenManual = QtWidgets.QAction(tr("Open &manual"), self)
         self.actionShowAbout = QtWidgets.QAction(tr("&About"), self)
@@ -824,6 +994,15 @@ class MainWindow(QMainWindow):
         self.actionOpenManual.triggered.connect(utils.open_manual)
 
         self.update_search(self.searchDock.editor.text())
+
+        self.server = QtNetwork.QLocalServer(self)
+        if self.server.listen(pidfile.stem):
+            pidfile.write_text(pidfile.stem)
+            self.server.newConnection.connect(self.on_new_connection)
+        else:
+            print(f"Could not listen on {pidfile.stem}", file=sys.stderr)
+            del self.server
+            self.server = None
 
         self.settings.accept_changes = True
 
@@ -857,6 +1036,8 @@ class MainWindow(QMainWindow):
         searchMenu.addAction(self.actionSearches)
         self.editMenu.addSeparator()
         self.editMenu.addAction(self.actionNew)
+        self.editMenu.addAction(self.actionNewRefTask)
+        self.editMenu.addAction(self.actionNewAfterTask)
         self.editMenu.addAction(self.actionEdit)
         self.editMenu.addSeparator()
         self.editMenu.addAction(self.actionDelegate)
@@ -879,6 +1060,8 @@ class MainWindow(QMainWindow):
         keymapping = [
                 (common.SETTING_GK_QUIT, self.actionQuit, Qt.ApplicationShortcut),
                 (common.SETTING_GK_NEW, self.actionNew, Qt.ApplicationShortcut),
+                (common.SETTING_GK_NEW_REF, self.actionNewRefTask, Qt.WindowShortcut),
+                (common.SETTING_GK_NEW_AFTER, self.actionNewAfterTask, Qt.WindowShortcut),
                 (common.SETTING_GK_EDIT, self.actionEdit, Qt.WindowShortcut),
                 (common.SETTING_GK_TOGGLE_DONE, self.actionToggleDone, Qt.WindowShortcut),
                 (common.SETTING_GK_SEARCH, self.actionSearch, Qt.ApplicationShortcut),
@@ -901,6 +1084,7 @@ class MainWindow(QMainWindow):
                                                  SETTING_DOCKING,
                                                  Qt.TopDockWidgetArea), self.searchDock)
         self.searchDock.editor.textChanged.connect(self.update_search)
+        self.searchDock.editor.returnPressed.connect(self.taskList.setFocus)
         self.actionSearch.triggered.connect(self.do_show_search)
         self.searchDock.saveButton.clicked.connect(self.do_save_search)
 
@@ -912,12 +1096,29 @@ class MainWindow(QMainWindow):
         self.actionFocusTasks.triggered.connect(self.taskList.setFocus)
         self.actionShowAbout.triggered.connect(self.do_show_about)
 
+        self.taskModel.dataChanged.connect(self.refresh_caches)
+        self.taskModel.modelReset.connect(self.refresh_caches)
+        self.taskModel.rowsInserted.connect(self.refresh_caches)
+
+        self.taskList.wordClicked.connect(self.add_to_search)
+
+    def refresh_caches(self):
+        for source in self.sources:
+            source.update_contexts_and_projects()
+        self.searcher.update_sources(self.sources)
+        self.taskList.model().invalidate()
+
     def update_completers(self, words):
         self.searchDock.update_completion(words)
         if self.creator is not None:
             self.creator.update_completion(words)
         if self.editor is not None:
            self.editor.update_completion(words)
+
+    def add_to_search(self, word):
+        if word in self.searcher.text.split(' '):
+            return
+        self.searchDock.editor.setText(self.searchDock.editor.text() + " " + word)
 
     def update_search(self, text):
         self.searcher.text = text
@@ -937,19 +1138,23 @@ class MainWindow(QMainWindow):
         self.editor.show()
 
     def start_creator(self, sources):
-        if len(sources) == 0:
-            # TODO: show a warning why this action is not possible
-            return
-
         if self.creator is None:
             self.creator = DockTaskCreator(self.settings, self.config, tr("New task"))
             self.addDockWidget(Qt.BottomDockWidgetArea, self.creator)
             self.creator.saveButton.clicked.connect(self.do_create_task)
             self.creator.editor.returnPressed.connect(self.do_create_task)
 
-        if sorted(self.creator.sources) != sorted(sources):
+        if sorted(self.creator.sources) != sorted(self.sources):
+            self.sources = sources
             self.creator.sources = sources
         self.creator.sourceSelector.setVisible(len(sources) > 1)
+
+        if self.create_from_search:
+            text = utils.create_from_search(self.searcher)
+            if len(text) > 0:
+                text += " "
+            self.creator.editor.setText(text)
+
         self.creator.editor.setFocus()
         self.creator.do_show()
 
@@ -970,6 +1175,7 @@ class MainWindow(QMainWindow):
         if not self.editor.has_changes() or len(text) == 0:
             self.editor.do_cancel()
             return
+        text = utils.auto_task_id(self.sources, text)
         text = utils.dehumanize_dates(text)
         taskindex = self.editor.tm_index
         task = taskindex.data(TASK_ROLE)
@@ -990,6 +1196,9 @@ class MainWindow(QMainWindow):
                 self.editor.do_cancel()
 
     def do_create_task(self):
+        if len(self.creator.sources) == 0:
+            self.creator.do_cancel()
+            return
         source = self.creator.sources[self.creator.sourceSelector.currentIndex()]
         self.creator.mr_source = source.filename
 
@@ -998,11 +1207,14 @@ class MainWindow(QMainWindow):
             self.creator.do_cancel()
             return
 
+        if self.auto_id and not any([word.startswith('id:') for word in text.split(' ')]):
+            text += ' id:#'
+        text = utils.auto_task_id(self.sources, text)
         text = utils.dehumanize_dates(text)
         task = Task(text, todotxt=source)
         if task.creation_date is None and self.creator.chkCreationDate.isChecked():
             task.creation_date = datetime.date.today()
-            task.raw = str(task)
+            task.parse(str(task))
         update_all = False
         if source.refresh():
             update_all = True
@@ -1044,12 +1256,43 @@ class MainWindow(QMainWindow):
 
     def do_show_about(self):
         QtWidgets.QMessageBox.about(self,
-                                    tr("qpter"),
-                                    tr(ABOUT_DIALOG_TEXT).format(version=version.__version__))
+                                    tr(common.QTPROGRAMNAME),
+                                    tr(ABOUT_DIALOG_TEXT)
+                                        .format(version=version.__version__,
+                                                qtprogramname=common.QTPROGRAMNAME,
+                                                programname=common.PROGRAMNAME))
+
+    def on_new_connection(self):
+        if self.server is None or not self.server.hasPendingConnections():
+            return
+        
+        sock = self.server.nextPendingConnection()
+        sock.waitForReadyRead(1000)
+        if sock.bytesAvailable() == 4:
+            cmd = sock.readLine(4)
+            if str(cmd, 'ascii') == "new":
+                self.activateWindow()
+                self.actionNew.trigger()
+        sock.abort()
+
+    def closeEvent(self, event):
+        if self.server is not None:
+            self.server.close()
+            del self.server
+            self.server = None
+        self.store_size()
+
+        self.settings.save()
+        self.settings.accept_changes = False
+        try:
+            self.pidfile.unlink(missing_ok=True)
+        except:
+            pass
+        event.accept()
 
 
 class Program:
-    def __init__(self, config, sources):
+    def __init__(self, config, sources, pidfile):
         self.config = config
         self.sources = sources
 
@@ -1071,10 +1314,12 @@ class Program:
             if fullpath.exists():
                 self.icon.addFile(str(fullpath), QtCore.QSize(size, size))
 
-        self.window = MainWindow(config)
+        self.window = MainWindow(config, pidfile, sources)
         self.window.actionOpen.triggered.connect(self.do_open_source)
         self.window.actionQuit.triggered.connect(self.do_quit)
         self.window.actionNew.triggered.connect(self.do_create)
+        self.window.actionNewRefTask.triggered.connect(lambda: self.do_create_ref('ref'))
+        self.window.actionNewAfterTask.triggered.connect(lambda: self.do_create_ref('after'))
         self.window.actionEdit.triggered.connect(self.do_edit)
         self.window.actionToggleDone.triggered.connect(self.do_toggle_done)
         self.window.actionToggleTracking.triggered.connect(self.do_toggle_tracking)
@@ -1096,19 +1341,15 @@ class Program:
 
         for source in self.sources:
             self.window.watcher.addPath(str(source.filename))
+
         self.expect_change = []
         self.window.watcher.fileChanged.connect(self.source_changed)
 
-        self.window.taskModel.dataChanged.connect(lambda _0, _1, _2:
-                self.update_completers())
-        self.window.taskModel.modelReset.connect(lambda:
-                self.update_completers())
-        self.window.taskModel.dataChanged.connect(self.window.taskList.do_model_invalidate)
-        self.window.taskModel.modelReset.connect(self.window.taskList.do_model_invalidate)
-        self.window.taskModel.rowsInserted.connect(self.window.taskList.do_model_invalidate)
+        # self.window.taskModel.dataChanged.connect(lambda _0, _1, _2: self.update_completers())
+        # self.window.taskModel.modelReset.connect(self.update_completers)
+        # self.window.taskModel.rowsInserted.connect(self.update_completers)
 
         self.update_sources()
-        self.window.taskList.do_model_invalidate()
 
     def update_completers(self):
         pass
@@ -1134,6 +1375,24 @@ class Program:
     def do_create(self):
         self.window.start_creator(self.sources)
         self.update_completers()
+
+    def do_create_ref(self, reftype='ref'):
+        taskindex = self.window.taskList.get_selected_index()
+        if taskindex is None:
+            return
+
+        taskindex = self.window.taskModel.ensure_up_to_date(taskindex)
+        if taskindex is not None:
+            task = taskindex.data(TASK_ROLE)
+            if len(task.attr_id) == 0:
+                task.parse(utils.auto_task_id(self.sources, str(task) + ' id:#'))
+                task.todotxt.save(safe=self.safe_save)
+                self.window.taskModel.setData(taskindex, task)
+
+            refid = task.attr_id[0]
+            self.do_create()
+            ref = f"{reftype}:{refid}"
+            self.window.creator.editor.setText(ref + " " + self.window.creator.editor.text())
 
     def do_toggle_done(self):
         taskindex = self.window.taskList.get_selected_index()
@@ -1258,23 +1517,52 @@ class Program:
 
     def update_sources(self):
         # TODO list sources in Program menu
+        self.window.searcher.update_sources(self.sources)
         self.window.taskModel.sources = self.sources
-        self.window.taskModel.reload()
         utils.update_displaynames(self.sources)
+        self.window.taskModel.reload()
 
     def do_quit(self):
-        self.window.store_size()
-
-        self.window.settings.save()
-        self.window.settings.accept_changes = False
         self.window.close()
 
 
-def run_qtui(config, sources, args):
+def run_qtui(args):
+    tmpdir = pathlib.Path(QtCore.QDir.tempPath())
+    tmpdir.mkdir(parents=True, exist_ok=True)
+    username = getpass.getuser().replace(' ', '_')
+    fn = f"{common.QTPROGRAMNAME}-{username}.pid"
+    fullpath = tmpdir / fn
+
+    if args.add_task and fullpath.exists():
+        servername = fullpath.read_text()
+        if servername == '-':
+            print(tr("Could not connect to running program"))
+            return
+        sock = QtNetwork.QLocalSocket()
+        sock.connectToServer(servername)
+        if sock.waitForConnected(300):
+            sock.writeData(bytes("new\n", 'ascii'))
+            sock.flush()
+        else:
+            print(tr("Connection to program timed out"))
+        sock.abort()
+        return
+
+    if fullpath.exists():
+        print(tr(f"{common.QTPROGRAMNAME} is already running. "\
+                 f"If you know that not to be true, delete {fullpath}"))
+        return
+    fullpath.write_text("-")
+
     app = QApplication([])
-    app.setApplicationName("qpter")
+    app.setApplicationName(common.QTPROGRAMNAME)
     app.setApplicationVersion(version.__version__)
-    p = Program(config, sources)
+    p = Program(configuration.get_config(args), utils.open_sources(args), fullpath)
     p.window.actionShowAboutQt.triggered.connect(app.aboutQt)
+    p.window.activateWindow()
+
+    if args.add_task:
+        p.window.actionNew.trigger()
+
     return app.exec_()
 
