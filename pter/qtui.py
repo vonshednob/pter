@@ -6,6 +6,7 @@ import pathlib
 import getpass
 import sys
 import webbrowser
+import os
 
 from pytodotxt import Task, TodoTxt
 
@@ -13,6 +14,12 @@ import PyQt5
 from PyQt5 import QtWidgets, QtCore, QtGui, QtNetwork
 from PyQt5.QtWidgets import QApplication, QMainWindow
 from PyQt5.QtCore import Qt
+
+try:
+    import qdarkstyle
+except ImportError:
+    qdarkstyle = None
+
 
 from pter import common
 from pter import utils
@@ -58,6 +65,7 @@ SETTING_GROUP_SAVEDSEARCHES = 'SavedSearches'
 SETTING_GROUP_SEARCH_EDITOR = 'Search'
 SETTING_GROUP_MAINWINDOW = 'Window'
 SETTING_GROUP_CREATE = 'CreateTask'
+SETTING_DARK_MODE = 'dark-mode'
 SETTING_VISIBLE = 'visible'
 SETTING_DOCKING = 'docking'
 SETTING_FLOATING = 'floating'
@@ -148,14 +156,11 @@ class DecorationContext:
         self.color = colors
         self.attr_color = attr_colors
         self.fontmetrics = QtGui.QFontMetrics(self.font)
-        self.fontmetrics = QtGui.QFontMetrics(self.font)
-        self.space_width = self.fontmetrics.boundingRect('m w').width() - \
-                           self.fontmetrics.boundingRect('mw').width()
+        self.space_width = self.fontmetrics.boundingRect("w m").width() - \
+                           self.fontmetrics.boundingRect("mw").width()
 
         for colorname in self.color.keys():
             self.color[colorname] = QtGui.QColor(self.color[colorname])
-        if self.color.get(COLOR_NORMAL, None) is None:
-            self.color[COLOR_NORMAL] = QtGui.QColor('#000')
         for colorname in self.attr_color.keys():
             self.attr_color[colorname] = QtGui.QColor(self.attr_color[colorname])
 
@@ -164,7 +169,7 @@ class DecoratedTask:
     def __init__(self, context, task):
         self.context = context
         self._task = task
-        self.state_color = self.context.color[COLOR_NORMAL]
+        self.state_color = self.context.color.get(COLOR_NORMAL, None)
         self.diffdays = None
         self.age = None
         self.words = []
@@ -178,7 +183,7 @@ class DecoratedTask:
         self.rebuild()
 
     def rebuild(self):
-        self.state_color = self.context.color[COLOR_NORMAL]
+        self.state_color = self.context.color.get(COLOR_NORMAL, None)
         self.diffdays = None
         self.age = None
         if self.creation_date is not None:
@@ -316,7 +321,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
                                                         common.SETTING_ICON_TRACKING))
         self.colors = parse_colors(config, common.SETTING_GROUP_GUICOLORS)
         self.attr_colors = parse_colors(config, common.SETTING_GROUP_GUIHIGHLIGHT)
-        self.font = QtGui.QFont()
+        self.font = QtGui.QFont(QtWidgets.QApplication.font())
         fontsize = config.get(common.SETTING_GROUP_GUI, common.SETTING_FONTSIZE, None)
         if fontsize is not None and len(fontsize.strip()) > 0:
             if fontsize.endswith('px'):
@@ -369,7 +374,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         return self._tasks[index.row()]
 
     def setData(self, index, value, role=Qt.EditRole):
-        # index.data(TASK_ROLE).parse(str(value))
+        value.rebuild()
         self.dataChanged.emit(index, index)
         return True
 
@@ -672,6 +677,8 @@ class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
                     if clickable and color is None:
                         color = task.context.color.get(common.SETTING_COL_URL, None)
                     color = color or task.state_color
+            if color is None:
+                color = option.palette.text().color()
             painter.setPen(color)
             if clickable:
                 task.rects.append((QtCore.QRect(cursor, option.rect.y(), rect.width(), rect.height()),
@@ -982,6 +989,13 @@ class MainWindow(QMainWindow):
         self.actionDelegate = QtWidgets.QAction(tr("Dele&gate task"), self)
         self.actionNewRefTask = QtWidgets.QAction(tr("New &related task"), self)
         self.actionNewAfterTask = QtWidgets.QAction(tr("New &subsequent task"), self)
+        self.actionToggleDarkStyle = None
+
+        if qdarkstyle is not None:
+            self.actionToggleDarkStyle = QtWidgets.QAction(tr("Toggle &dark mode"))
+            self.actionToggleDarkStyle.triggered.connect(self.do_toggle_dark_mode)
+            if self.settings.bool(SETTING_GROUP_MAINWINDOW, SETTING_DARK_MODE, "no"):
+                QtWidgets.QApplication.instance().setStyleSheet(qdarkstyle.load_stylesheet(qt_api='pyqt5'))
 
         self.actionOpenManual = QtWidgets.QAction(tr("Open &manual"), self)
         self.actionShowAbout = QtWidgets.QAction(tr("&About"), self)
@@ -996,11 +1010,13 @@ class MainWindow(QMainWindow):
         self.update_search(self.searchDock.editor.text())
 
         self.server = QtNetwork.QLocalServer(self)
-        if self.server.listen(pidfile.stem):
-            pidfile.write_text(pidfile.stem)
+        servername = pidfile.stem + "-" + str(os.getpid())
+        attempt = 0
+        if self.server.listen(servername):
+            pidfile.write_text(self.server.fullServerName())
             self.server.newConnection.connect(self.on_new_connection)
         else:
-            print(f"Could not listen on {pidfile.stem}", file=sys.stderr)
+            print(f"Could not listen on {servername}", file=sys.stderr)
             del self.server
             self.server = None
 
@@ -1031,6 +1047,9 @@ class MainWindow(QMainWindow):
         self.programMenu.addAction(self.actionOpen)
         self.programMenu.addAction(self.actionFocusTasks)
         self.programMenu.addSeparator()
+        if self.actionToggleDarkStyle is not None:
+            self.programMenu.addAction(self.actionToggleDarkStyle)
+            self.programMenu.addSeparator()
         self.programMenu.addAction(self.actionQuit)
         searchMenu.addAction(self.actionSearch)
         searchMenu.addAction(self.actionSearches)
@@ -1072,10 +1091,11 @@ class MainWindow(QMainWindow):
                 (common.SETTING_GK_OPEN_FILE, self.actionOpen, Qt.ApplicationShortcut),
                 (common.SETTING_GK_TOGGLE_HIDDEN, self.actionToggleHidden, Qt.WindowShortcut),
                 (common.SETTING_GK_DELEGATE, self.actionDelegate, Qt.WindowShortcut),
+                (common.SETTING_GK_TOGGLE_DARK, self.actionToggleDarkStyle, Qt.ApplicationShortcut),
                 ]
         for name, target, context in keymapping:
             keys = self.config.get(common.SETTING_GROUP_GUIKEYS, name)
-            if len(keys) > 0:
+            if len(keys) > 0 and target is not None:
                 target.setShortcut(QtGui.QKeySequence(keys))
                 target.setShortcutContext(context)
 
@@ -1107,6 +1127,7 @@ class MainWindow(QMainWindow):
             source.update_contexts_and_projects()
         self.searcher.update_sources(self.sources)
         self.taskList.model().invalidate()
+        self.taskList.model().dataChanged.emit(QtCore.QModelIndex(), QtCore.QModelIndex())
 
     def update_completers(self, words):
         self.searchDock.update_completion(words)
@@ -1169,6 +1190,19 @@ class MainWindow(QMainWindow):
             self.savedSearchesDock.store_size()
         if self.creator is not None:
             self.creator.store_size()
+
+    def do_toggle_dark_mode(self):
+        if qdarkstyle is None:
+            return
+        current = self.settings.bool(SETTING_GROUP_MAINWINDOW, SETTING_DARK_MODE, "no")
+        current = not current
+        self.settings.update(SETTING_GROUP_MAINWINDOW, SETTING_DARK_MODE, current)
+        if current:
+            stylesheet = qdarkstyle.load_stylesheet(qt_api="pyqt5")
+        else:
+            stylesheet = ""
+        QtWidgets.QApplication.instance().setStyleSheet(stylesheet)
+        self.taskList.model().invalidate()
 
     def do_save_task(self):
         text = self.editor.editor.text().strip()
@@ -1267,12 +1301,16 @@ class MainWindow(QMainWindow):
             return
         
         sock = self.server.nextPendingConnection()
-        sock.waitForReadyRead(1000)
-        if sock.bytesAvailable() == 4:
-            cmd = sock.readLine(4)
-            if str(cmd, 'ascii') == "new":
-                self.activateWindow()
-                self.actionNew.trigger()
+        while True:
+            sock.waitForReadyRead(1000)
+            if sock.bytesAvailable() == 4:
+                cmd = sock.readLine(4)
+                if str(cmd, 'ascii') == "new":
+                    self.activateWindow()
+                    self.actionNew.trigger()
+                elif str(cmd, 'ascii') == "hoi":
+                    continue
+            break
         sock.abort()
 
     def closeEvent(self, event):
@@ -1533,22 +1571,33 @@ def run_qtui(args):
     fn = f"{common.QTPROGRAMNAME}-{username}.pid"
     fullpath = tmpdir / fn
 
-    if args.add_task and fullpath.exists():
+    sock = None
+    if fullpath.exists():
         servername = fullpath.read_text()
-        if servername == '-':
+        if servername != '-':
+            sock = QtNetwork.QLocalSocket()
+            sock.connectToServer(servername)
+            if not sock.waitForConnected(300):
+                sock.abort()
+                sock = None
+                fullpath.unlink()
+            else:
+                if sock.writeData(bytes("hoi\n", 'ascii')) == -1:
+                    sock.abort()
+                    sock = None
+                else:
+                    sock.flush()
+
+    if args.add_task:
+        if sock is None:
             print(tr("Could not connect to running program"))
-            return
-        sock = QtNetwork.QLocalSocket()
-        sock.connectToServer(servername)
-        if sock.waitForConnected(300):
+        else:
             sock.writeData(bytes("new\n", 'ascii'))
             sock.flush()
-        else:
-            print(tr("Connection to program timed out"))
-        sock.abort()
-        return
+            sock.abort()
+            return
 
-    if fullpath.exists():
+    if sock is not None:
         print(tr(f"{common.QTPROGRAMNAME} is already running. "\
                  f"If you know that not to be true, delete {fullpath}"))
         return

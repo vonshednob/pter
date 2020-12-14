@@ -108,6 +108,7 @@ SETTING_GK_OPEN_MANUAL = 'open-manual'
 SETTING_GK_NAMED_SEARCHES = 'named-searches'
 SETTING_GK_FOCUS_TASKS = 'focus-tasks'
 SETTING_GK_TOGGLE_HIDDEN = 'toggle-hidden'
+SETTING_GK_TOGGLE_DARK = 'toggle-dark-mode'
 SETTING_GK_DELEGATE = 'delegate'
 
 TF_SELECTION = 'selection'

@@ -9,3 +9,10 @@ Exec=qpter
 Terminal=false
 Type=Application
 Categories=Utility;Office;Qt
+Actions=new
+
+[Desktop Action new]
+Name=New task
+Comment=Create a task
+Exec=qpter -a
+

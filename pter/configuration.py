@@ -92,6 +92,7 @@ DEFAULT_CONFIG = {
             common.SETTING_GK_FOCUS_TASKS: 'F6',
             common.SETTING_GK_TOGGLE_HIDDEN: 'Ctrl+H',
             common.SETTING_GK_DELEGATE: 'Ctrl+G',
+            common.SETTING_GK_TOGGLE_DARK: '',
         },
 }
 

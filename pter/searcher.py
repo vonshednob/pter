@@ -14,6 +14,8 @@ class Searcher:
         self.not_contexts = set()
         self.ids = set()
         self.not_ids = set()
+        self.filenames = set()
+        self.not_filenames = set()
         self.after = set()
         self.refs = set()
         self.done = None
@@ -45,6 +47,8 @@ class Searcher:
         self.not_contexts = set()
         self.ids = set()
         self.not_ids = set()
+        self.filenames = set()
+        self.not_filenames = set()
         self.after = set()
         self.refs = set()
         self.done = None
@@ -251,6 +255,14 @@ class Searcher:
                         pass
                     else:
                         self.refs |= values
+
+            elif part.startswith('file:'):
+                _, value = part.split(':', 1)
+                if len(value) > 0:
+                    if do_not:
+                        self.not_filenames.add(value)
+                    else:
+                        self.filenames.add(value)
             
             else:
                 if do_not:
@@ -268,6 +280,7 @@ class Searcher:
                     self.match_hidden(attrs),
                     self.match_priority(task),
                     self.match_ids(task),
+                    self.match_filenames(task),
                     self.match_refs(task),
                     self.match_after(task, attrs),
                     self.match_due(attrs),
@@ -397,6 +410,15 @@ class Searcher:
 
         return len(ids) > 0 and \
                len(self.refs.intersection(ids)) > 0
+
+    def match_filenames(self, task):
+        if len(self.filenames) + len(self.not_filenames) == 0:
+            return True
+
+        return hasattr(task, 'todotxt') is not None and \
+               task.todotxt is not None and \
+               all([pattern in str(task.todotxt.filename) for pattern in self.filenames]) and \
+               not any([pattern in str(task.todotxt.filename) for pattern in self.not_filenames])
 
     def match_after(self, task, attrs):
         if self.after is None:

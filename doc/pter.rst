@@ -304,7 +304,7 @@ GUI Keys
 ~~~~~~~~
 
 To assign shortcuts to functions in the Qt GUI, you will have to use the Qt
-style key names, see `https://doc.qt.io/qt-5/qkeysequence.html#details`_ .
+style key names, see https://doc.qt.io/qt-5/qkeysequence.html#details .
 
 The assignment is done in the group ``GUI:Keys``, like this::
 
@@ -333,7 +333,9 @@ Available function names are:
  - ``search``, opens and focuses the search field,
  - ``named-searches``, opens and focuses the list of named searches,
  - ``focus-tasks``, focuses the task list,
- - ``delegate``, delegate the selected task
+ - ``delegate``, delegate the selected task,
+ - ``toggle-dark-mode``, toggle between dark and light mode (requires
+   qdarkstyle to be installed)
 
 
 Colors
@@ -803,6 +805,16 @@ or ``after:``) can be found by searching for ``ref:``.
 
 If you search using multiple references (eg. ``ref:4,5`` or ``ref:4
 ref:5``) the task IDs are considered a logical ``or``.
+
+
+Filename
+--------
+
+You can search for parts of a filename that a task belongs to with
+``file:``. ``not:`` can be used to exclude tasks that belong to a certain
+file.
+
+For example: ``file:todo.txt`` or ``-file:archive``.
 
 
 Named Searches

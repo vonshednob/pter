@@ -182,9 +182,7 @@ def sort_fnc(a):
         task = a
     daydiff = task_due_in_days(task)
     if daydiff is None:
-        daydiff = 2
-    else:
-        daydiff = sign(daydiff)
+        daydiff = sys.maxsize
     prio = task.priority
     if prio is None:
         prio = 'ZZZ'
@@ -371,6 +369,7 @@ def parse_searches():
 
 
 def save_searches(searches):
+    common.SEARCHES_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(common.SEARCHES_FILE, 'wt', encoding="utf-8") as fd:
         for name in sorted(searches.keys()):
             value = searches[name].strip()
