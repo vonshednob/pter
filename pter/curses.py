@@ -277,6 +277,7 @@ class Window:
         self.search_bar = None
         self.status_bar = None
         self.help_bar = None
+        self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
         self.search = Searcher('',
                                self.conf.bool(common.SETTING_GROUP_GENERAL,
                                               common.SETTING_SEARCH_CASE_SENSITIVE),
@@ -512,7 +513,7 @@ class Window:
         self.tasks = []
         for source in self.sources:
             self.tasks += [(task, source) for task in source.tasks]
-        self.tasks.sort(key=utils.sort_fnc)
+        self.tasks.sort(key=lambda t: utils.sort_fnc(t, self.sort_order))
 
         self.apply_search()
 

@@ -158,6 +158,8 @@ class DecorationContext:
         self.fontmetrics = QtGui.QFontMetrics(self.font)
         self.space_width = self.fontmetrics.boundingRect("w m").width() - \
                            self.fontmetrics.boundingRect("mw").width()
+        self.baseline_offset = self.fontmetrics.height()/3
+        self.strike_height = self.fontmetrics.strikeOutPos()
 
         for colorname in self.color.keys():
             self.color[colorname] = QtGui.QColor(self.color[colorname])
@@ -305,6 +307,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         self.config = config
         self.sources = []
         self._tasks = []
+        self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
         self.human_friendly_dates = set(config.list(common.SETTING_GROUP_GENERAL,
                                                     common.SETTING_HUMAN_DATES))
         self.done_marker = (utils.unquote(config.get(common.SETTING_GROUP_SYMBOLS,
@@ -390,7 +393,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         if role == SOURCE_ROLE:
             return self.task(index).todotxt
         if role == SORT_ROLE:
-            return utils.sort_fnc(self.task(index))
+            return utils.sort_fnc(self.task(index), self.sort_order)
         if role == Qt.FontRole:
             return self.font
 
@@ -653,7 +656,9 @@ class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
         task = index.data(TASK_ROLE)
         painter.setFont(task.context.font)
         painter.setClipRect(option.rect)
-        baseline = option.rect.y() + task.context.fontmetrics.ascent()
+        middle = option.rect.y() + option.rect.height()/2
+        baseline = middle + task.context.baseline_offset
+        strike_height = baseline - task.context.strike_height
         cursor = option.rect.x()
         task.rects = []
         for word, rect in task.words:
@@ -689,9 +694,8 @@ class TaskDescriptionDelegate(QtWidgets.QAbstractItemDelegate):
             cursor += rect.width() + task.context.space_width
         if task.is_completed:
             painter.setPen(task.state_color)
-            middle = option.rect.y() + task.context.fontmetrics.height()/2
-            painter.drawLine(option.rect.x(), middle,
-                             cursor-task.context.space_width, middle)
+            painter.drawLine(option.rect.x(), strike_height,
+                             cursor-task.context.space_width, strike_height)
         painter.restore()
 
     def sizeHint(self, option, index):
@@ -964,6 +968,13 @@ class MainWindow(QMainWindow):
         self.completion = None
         self.editMenu = None
         self.sources = sources
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.detect_new_day)
+        self.timer.start(60000)
+        self.last_refresh = datetime.datetime.min
+        self.refresh_time = self.config.time(common.SETTING_GROUP_GUI,
+                                             common.SETTING_DAILY_RELOAD,
+                                             datetime.time(0, 0))
 
         self.watcher = QtCore.QFileSystemWatcher(self)
 
@@ -1128,6 +1139,16 @@ class MainWindow(QMainWindow):
         self.searcher.update_sources(self.sources)
         self.taskList.model().invalidate()
         self.taskList.model().dataChanged.emit(QtCore.QModelIndex(), QtCore.QModelIndex())
+        self.last_refresh = datetime.datetime.now()
+
+    def detect_new_day(self):
+        now = datetime.datetime.now()
+        then = now.replace(hour=self.refresh_time.hour,
+                           minute=self.refresh_time.minute,
+                           second=0, microsecond=0)
+
+        if self.last_refresh.day != now.day and then < now:
+            self.refresh_caches()
 
     def update_completers(self, words):
         self.searchDock.update_completion(words)
@@ -1142,6 +1163,10 @@ class MainWindow(QMainWindow):
         self.searchDock.editor.setText(self.searchDock.editor.text() + " " + word)
 
     def update_search(self, text):
+        for part in text.split(' '):
+            if part.startswith('sort:'):
+                self.taskModel.sort_order = utils.build_sort_order(part.split(':', 1)[1])
+                break
         self.searcher.text = text
         self.settings.update(SETTING_GROUP_MAINWINDOW, SETTING_MR_SEARCH, text)
         self.searcher.parse()

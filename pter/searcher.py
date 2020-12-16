@@ -114,6 +114,9 @@ class Searcher:
         for part in text.split(' '):
             do_not = False
 
+            if part.startswith('sort:'):
+                continue
+
             if part.startswith('not:'):
                 do_not = True
                 part = part[4:]

@@ -1,5 +1,6 @@
 import pathlib
 import configparser
+import datetime
 
 from pter import common
 
@@ -68,6 +69,7 @@ DEFAULT_CONFIG = {
         common.SETTING_GROUP_GUI: {
             common.SETTING_SINGLE_INSTANCE: 'yes',
             common.SETTING_CLICKABLE: 'yes',
+            common.SETTING_DAILY_RELOAD: '00:00',
         },
         common.SETTING_GROUP_KEYS: {
         },
@@ -128,6 +130,13 @@ class Configuration:
         if value.isnumeric():
             return int(value)
         return None
+
+    def time(self, group, item, default=None):
+        value = self.get(group, item, None)
+        try:
+            return datetime.datetime.strptime(value, "%H:%M")
+        except ValueError:
+            return default
 
     def color_pair(self, group, item, default=None):
         value = self.get(group, item, default)

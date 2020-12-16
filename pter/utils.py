@@ -175,19 +175,32 @@ def sign(n):
     return 0
 
 
-def sort_fnc(a):
+def build_sort_order(order):
+    sort_order = []
+    for part in order.split(','):
+        if part == 'completed':
+            sort_order.append(lambda t: t.is_completed)
+        elif part == 'due_in':
+            sort_order.append(lambda t: task_due_in_days(t) or sys.maxsize)
+        elif part == 'priority':
+            sort_order.append(lambda t: t.priority or 'ZZZ')
+        elif part == 'linenr':
+            sort_order.append(lambda t: t.linenr)
+        elif part == 'file':
+            sort_order.append(lambda t: t.todotxt.displayname.lower())
+        elif part == 'project':
+            sort_order.append(lambda t: sorted(t.projects)[0].lower() if len(t.projects) > 0 else 'zzzzz')
+        elif part == 'context':
+            sort_order.append(lambda t: sorted(t.contexts)[0].lower() if len(t.contexts) > 0 else 'zzzzz')
+    return sort_order
+
+
+def sort_fnc(a, order):
     if isinstance(a, tuple):
         task, _ = a
     else:
         task = a
-    daydiff = task_due_in_days(task)
-    if daydiff is None:
-        daydiff = sys.maxsize
-    prio = task.priority
-    if prio is None:
-        prio = 'ZZZ'
-    tracking = len(task.attr_tracking) > 0
-    return [task.is_completed, daydiff, prio, task.linenr]
+    return [fnc(task) for fnc in order]
 
 
 def update_spent(task):

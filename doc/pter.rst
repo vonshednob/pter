@@ -26,6 +26,7 @@ pter offers these features:
  - Fully compatible to the todo.txt standard
  - Support for `due:`, `h:`, `t:`
  - Save search queries for quick access (see `Searching`_ and `Named Searches`_)
+ - Sort tasks through search queries (see `Sorting`_)
  - Convenient entering of dates (see `Relative Dates`_)
  - Configurable behaviour, shortcuts, and colors (see `Files`_)
  - Time tracking
@@ -529,6 +530,10 @@ The GUI specific options are defined in the ``[GUI]`` section:
     may improve performance. The default is ``yes``, ie. URLs, contexts,
     and projects are clickable.
 
+  ``daily-reload``
+    The time (in format HH:MM) when qpter will automatically reload upon
+    passing midnight. Defaults to 00:00.
+
 
 Keyboard controls
 =================
@@ -815,6 +820,39 @@ You can search for parts of a filename that a task belongs to with
 file.
 
 For example: ``file:todo.txt`` or ``-file:archive``.
+
+
+Sorting
+=======
+
+Tasks can be sorted by passing ``sort:`` to the search. The properties of
+tasks to sort by are separated by comma. The following properties can be
+used for sorting:
+
+  ``due_in``
+    The number of days until the task is due, if there is a due
+    date given.
+
+  ``completed``
+    Whether or not the task has been completed.
+
+  ``priority``
+    The priority of the task, if any.
+
+  ``linenr``
+    The line of the task in its todo.txt file
+
+  ``file``
+    The name of the todo.txt file the task is in.
+
+  ``project``
+    The first project (alphabetically sorted) of the task.
+
+  ``context``
+    The first context (alphabetically sorted) of the task.
+
+The default sorting order is ``completed,due_in,priority,linenr`` and will
+be assumed if no ``sort:`` is provided in the search.
 
 
 Named Searches
