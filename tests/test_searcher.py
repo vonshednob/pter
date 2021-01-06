@@ -26,6 +26,7 @@ class SearcherTest(unittest.TestCase):
         source.update_contexts_and_projects()
         self.searcher.update_sources([source])
         for task in source.tasks:
+            task.todotxt = source
             if self.searcher.match(task):
                 result.append(task)
         return result
@@ -197,4 +198,26 @@ class TestRef(SearcherTest):
         results = self.search('ref:4', tasks)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0].attr_id, ['2'])
+
+
+class SearchFilename(SearcherTest):
+    def test_match(self):
+        tasks = [Task('a id:1')]
+        results = self.search('file:test', tasks)
+        self.assertEqual(len(results), 1)
+
+    def test_no_match(self):
+        tasks = [Task('a id:1')]
+        results = self.search('file:nope', tasks)
+        self.assertEqual(len(results), 0)
+
+    def test_match_not(self):
+        tasks = [Task('a id:1')]
+        results = self.search('not:file:test', tasks)
+        self.assertEqual(len(results), 0)
+
+    def test_no_match_not(self):
+        tasks = [Task('a id:1')]
+        results = self.search('not:file:nope', tasks)
+        self.assertEqual(len(results), 1)
 

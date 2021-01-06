@@ -1,7 +1,8 @@
-recursive-include pter *.py *.html
+recursive-include pter *.py *.html *.png
 recursive-include tests *.py
 
 recursive-include extras *.conf *.desktop
+recursive-include doc *
 recursive-include man *
 
 include CHANGELOG.md

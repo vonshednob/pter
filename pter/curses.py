@@ -509,15 +509,22 @@ class Window:
             x += len(label) + 1
         self.help_bar.noutrefresh()
 
+    def update_sorting(self):
+        for part in self.search.text.split(' '):
+            if part.startswith('sort:'):
+                self.sort_order = utils.build_sort_order(part.split(':', 1)[1])
+                break
+        self.tasks.sort(key=lambda t: utils.sort_fnc(t, self.sort_order))
+
     def update_tasks(self):
         self.tasks = []
         for source in self.sources:
             self.tasks += [(task, source) for task in source.tasks]
-        self.tasks.sort(key=lambda t: utils.sort_fnc(t, self.sort_order))
 
         self.apply_search()
 
     def apply_search(self):
+        self.update_sorting()
         self.filtered_tasks = [(task, source) for task, source in self.tasks
                                if self.search.match(task)]
         self.rebuild_task_lines()

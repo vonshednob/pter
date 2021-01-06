@@ -5,6 +5,33 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.11
+### Fixed
+- Sorting did not work correctly in pter (issue [#51](https://git.spacepanda.se/bold-kitty/pter/issues/51))
+
+## 1.0.10
+### Added
+- `daily-reload` option added to qpter (issue [#49](https://git.spacepanda.se/bold-kitty/pter/issues/49))
+- `sort:` expression for (saved) searches (issue [#50](https://git.spacepanda.se/bold-kitty/pter/issues/50))
+
+### Fixed
+- Vertically center tasks in qpter
+
+## 1.0.9
+### Added
+- Search for `file:`
+
+## 1.0.8
+### Fixed
+- qpter now detects stale lock files
+- Use the application default font if none is given
+- Create configuration folder if it's missing (fixes a crash)
+- Tasks with due date were not sorted correctly
+- qpter would not show proper spacing between words when no font was configured
+
+### Added
+- Support for dark mode
+
 ## 1.0.7
 ### Added
 - qpter can be run with -a/--add-task to activate the running qpter and create
