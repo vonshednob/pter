@@ -308,6 +308,7 @@ class TaskDataModel(QtCore.QAbstractTableModel):
         self.sources = []
         self._tasks = []
         self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
+        self.sort_order_txt = common.DEFAULT_SORT_ORDER
         self.human_friendly_dates = set(config.list(common.SETTING_GROUP_GENERAL,
                                                     common.SETTING_HUMAN_DATES))
         self.done_marker = (utils.unquote(config.get(common.SETTING_GROUP_SYMBOLS,
@@ -1163,10 +1164,14 @@ class MainWindow(QMainWindow):
         self.searchDock.editor.setText(self.searchDock.editor.text() + " " + word)
 
     def update_search(self, text):
+        new_sort_order = common.DEFAULT_SORT_ORDER
         for part in text.split(' '):
             if part.startswith('sort:'):
-                self.taskModel.sort_order = utils.build_sort_order(part.split(':', 1)[1])
+                new_sort_order = part.split(':', 1)[1]
                 break
+        if new_sort_order != self.taskModel.sort_order_txt:
+            self.taskModel.sort_order = utils.build_sort_order(new_sort_order)
+            self.taskModel.sort_order_txt = new_sort_order
         self.searcher.text = text
         self.settings.update(SETTING_GROUP_MAINWINDOW, SETTING_MR_SEARCH, text)
         self.searcher.parse()

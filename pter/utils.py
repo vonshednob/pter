@@ -74,15 +74,15 @@ def parse_duration(text):
     return duration
 
 
-def task_due_in_days(task):
+def task_due_in_days(task, default=None):
     if len(task.attr_due) == 0:
-        return None
+        return default
     today = datetime.datetime.now().date()
     try:
         then = datetime.datetime.strptime(task.attr_due[0], Task.DATE_FMT).date()
         return (then - today).days
     except ValueError:
-        return None
+        return default
 
 
 def dehumanize_dates(text, tags=None):
@@ -181,7 +181,7 @@ def build_sort_order(order):
         if part == 'completed':
             sort_order.append(lambda t: t.is_completed)
         elif part == 'due_in':
-            sort_order.append(lambda t: task_due_in_days(t) or sys.maxsize)
+            sort_order.append(lambda t: task_due_in_days(t, sys.maxsize))
         elif part == 'priority':
             sort_order.append(lambda t: t.priority or 'ZZZ')
         elif part == 'linenr':

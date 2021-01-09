@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.12
+### Fixed
+- Regression regarding sorting (related to [#51](https://git.spacepanda.se/bold-kitty/pter/issues/51))
+
 ## 1.0.11
 ### Fixed
 - Sorting did not work correctly in pter (issue [#51](https://git.spacepanda.se/bold-kitty/pter/issues/51))

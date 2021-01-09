@@ -278,6 +278,7 @@ class Window:
         self.status_bar = None
         self.help_bar = None
         self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
+        self.sort_order_txt = common.DEFAULT_SORT_ORDER
         self.search = Searcher('',
                                self.conf.bool(common.SETTING_GROUP_GENERAL,
                                               common.SETTING_SEARCH_CASE_SENSITIVE),
@@ -510,10 +511,14 @@ class Window:
         self.help_bar.noutrefresh()
 
     def update_sorting(self):
+        new_sort_order = common.DEFAULT_SORT_ORDER
         for part in self.search.text.split(' '):
             if part.startswith('sort:'):
-                self.sort_order = utils.build_sort_order(part.split(':', 1)[1])
+                new_sort_order = part.split(':', 1)[1]
                 break
+        if self.sort_order_txt != new_sort_order:
+            self.sort_order_txt = new_sort_order
+            self.sort_order = utils.build_sort_order(new_sort_order)
         self.tasks.sort(key=lambda t: utils.sort_fnc(t, self.sort_order))
 
     def update_tasks(self):
