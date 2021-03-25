@@ -5,6 +5,16 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.14
+### Added
+- Support including extra configuration files (issue [#53](https://git.spacepanda.se/bold-kitty/pter/issues/53))
+- Man page, .desktop files, and an example configuration are installed with `pip install`
+
+## 1.0.13
+### Fixed
+- Fixed exception when the terminal resizes around pter (issue [#52](https://git.spacepande.se/bold-kitty/pter/issues/52))
+- `clear-contexts` is now working again (regression error)
+
 ## 1.0.12
 ### Fixed
 - Regression regarding sorting (related to [#51](https://git.spacepanda.se/bold-kitty/pter/issues/51))

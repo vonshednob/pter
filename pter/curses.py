@@ -878,10 +878,11 @@ class Window:
 
     def refresh_search_bar(self):
         self.search_bar.erase()
-        if len(self.search.text.strip()) == 0:
+        text = self.search.text.strip()
+        if len(text) == 0:
             self.search_bar.addstr(0, 1, tr('(no search active)'), self.color(common.SETTING_COL_INACTIVE))
         else:
-            self.search_bar.addstr(0, 1, self.search.text)
+            self.search_bar.addstr(0, 1, text[:curses.COLS-2])
         self.search_bar.refresh()
 
     def read_text(self, y, x, cols=None, text='', callback=None, select_source=None):

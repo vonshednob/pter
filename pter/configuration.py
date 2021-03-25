@@ -166,6 +166,10 @@ def get_config(args):
 
     if conffile.exists() and conffile.is_file():
         conf.read([conffile])
+
+    if common.SETTING_GROUP_INCLUDE in conf and 'path' in conf[common.SETTING_GROUP_INCLUDE]:
+        path = pathlib.Path(conf[common.SETTING_GROUP_INCLUDE]['path']).expanduser().resolve()
+        conf.read([path])
     
     return Configuration(conf)
 

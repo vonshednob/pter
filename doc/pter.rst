@@ -91,6 +91,7 @@ The configuration file has four sections (the names are case-sensitive):
  - `Highlight`_, for coloring specific tags of tasks,
  - GUI:Highlight, for coloring specific tags of tasks (GUI version, see `Highlight`_).
  - `GUI`_, for other GUI specific options
+ - `Include`_, to include another configuration file
 
 General
 -------
@@ -535,6 +536,20 @@ The GUI specific options are defined in the ``[GUI]`` section:
     passing midnight. Defaults to 00:00.
 
 
+Include
+-------
+
+You can specify a second configuration file to include after the primary
+configuration file been loaded. This secondary configuration supports all
+options as the primary but any option in the secondary configuration will
+override existing options of the primary configuration option.
+
+Example::
+
+    [Include]
+    path = ../extra.conf
+
+
 Keyboard controls
 =================
 
@@ -770,7 +785,7 @@ you can search for ``threshold:`` (or, short, ``t:``). See also the
 You can also pretend it’s a certain date in the future (eg. 2042-02-14) and
 see what tasks become available then by searching for ``threshold:2042-02-14``.
 
-``threshold`` can be abbreviated with ``t``. ``tickler` is also a synonym for
+``threshold`` can be abbreviated with ``t``. ``tickler`` is also a synonym for
 ``threshold``.
 
 Searching for ``threshold`` supports `Relative Dates`_.
@@ -993,16 +1008,33 @@ To see all tasks that are on your "Next task" list, a good start is to
 search for "``done:no not:@in``" (and save this search query, too).
 
 
+Extensions to todo.txt
+======================
+
+Pter is fully compatible with the standard format, but also supports
+the following extra key/value tags:
+
+- ``after:4``, signifies that this entry can only be started once entry with ``id:4`` has been completed.
+- ``due:2071-01-01``, defines a due date for this task.
+- ``h:1``, hides a task.
+- ``id:3``, allows you to assign a unique identifier to entries in the todo.txt, like ``3``. pter will accept when there non-unique IDs, but of course uniquely identifying entries will be tricky.
+- ``ref:6``, indicate that this task refers to the task with ``id:6``.  Comma-separated IDs are supported, like ``ref:13,9``.
+- ``spent:5h3m``, pter can be used for time tracking and will store the duration that was spent on a task in the ``spent`` attribute.
+- ``t:2070-12-24``, the threshold tag can be used to hide before the given date has come.
+- ``to:person``, when a task has been delegated (by using a delegation marker like ``@delegated``), ``to`` can be used to indicate to whom the task has been delegated. The option is configurable, see ``delegation-to`` above for details.
+- ``tracking:``, a technical tag used for time tracking. It indicates that you started working on the task and wanted to do time tracking. The value is the date and time when you started working. Upon stopping tracking, the spent time will be stored in the ``spent`` tag.
+
+
 Conforming to
 =============
 
 pter works with and uses the todo.txt file format and strictly adheres to the format
-as described at http://todotxt.org/.
+as described at http://todotxt.org/. Additional special key/value tags are
+described in the previous section.
 
 
 Bugs
 ====
 
 Probably plenty. Please report your findings at https://github.com/vonshednob/pter or via email to the authors.
-
 
