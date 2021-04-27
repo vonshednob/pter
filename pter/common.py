@@ -25,6 +25,7 @@ if BaseDirectory is not None:
     CACHEFILE = CACHEDIR / (PROGRAMNAME + ".settings")
 
 SEARCHES_FILE = CONFIGDIR / "searches.txt"
+TEMPLATES_FILE = CONFIGDIR / "templates.txt"
 
 URL_RE = re.compile(r'([A-Za-z][A-Za-z0-9+\-.]*)://([^ ]+)')
 

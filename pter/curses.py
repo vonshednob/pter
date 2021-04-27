@@ -134,6 +134,8 @@ class Window:
                             '^R': 'reload-tasks',
                             'u': 'open-url',
                             '>': 'delegate',
+                            'L': 'load-template',
+                            'S': 'save-template',
                             'l': 'load-search',
                             's': 'save-search',
                             '?': 'show-help',
@@ -201,6 +203,8 @@ class Window:
                           'search': self.do_start_search,
                           'search-context': self.do_search_context,
                           'search-project': self.do_search_project,
+                          'load-template': self.do_load_template,
+                          'save-template': self.do_save_template,
                           'load-search': self.do_load_search,
                           'save-search': self.do_save_search,
                           'first-item': self.do_go_first_task,
@@ -224,6 +228,8 @@ class Window:
                            'half-page-down': 'Half page down',
                            'search': 'Search',
                            'open-url': 'Open URL',
+                           'load-template': 'Load template',
+                           'save-template': 'Save template',
                            'load-search': 'Load search',
                            'save-search': 'Save search',
                            'search-context': 'Search for context of this task',
@@ -277,6 +283,7 @@ class Window:
         self.search_bar = None
         self.status_bar = None
         self.help_bar = None
+        self.selected_template = None
         self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
         self.sort_order_txt = common.DEFAULT_SORT_ORDER
         self.search = Searcher('',
@@ -1213,6 +1220,8 @@ class Window:
             today = datetime.datetime.now().strftime(Task.DATE_FMT) + ' '
         if self.create_from_search:
             today += utils.create_from_search(self.search)
+        if self.selected_template is not None:
+            today += self.selected_template
         text, source = self.read_text(y+1, 4, curses.COLS-8, today, select_source=frame)
         if text is not None:
             if self.auto_id and not any([word.startswith('id:') for word in text.split(' ')]):
@@ -1280,6 +1289,44 @@ class Window:
                                        self.color(common.SETTING_COL_ERROR))
                 self.status_bar.noutrefresh()
             self.update_tasks()
+
+    def do_load_template(self):
+        templates = utils.parse_templates()
+        if len(templates) == 0:
+            return
+        names = ['None'] + [name for name in sorted(templates.keys())]
+        name = self.select_one(names, tr('Load Template'), autoselect=False)
+        if names is not None and name in templates:
+            self.selected_template = templates[name]
+        elif name == 'None':
+            self.selected_template = None
+
+    def do_save_template(self):
+        y = curses.LINES//2 - 1
+        frame = curses.newwin(3, curses.COLS-6, y, 3)
+        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
+        frame.erase()
+        frame.border()
+        label = tr('Save Template')
+        if curses.COLS-8 > len(label):
+            frame.addstr(0, 2, f'┤{label}├')
+        frame.refresh()
+
+        text = self.read_text(y+1, 4, curses.COLS-8, '')
+
+        if text is not None and len(text.strip()) > 0:
+            templates = utils.parse_templates()
+
+            if not (len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks)):
+                task, source = self.filtered_tasks[self.selected_task]
+                raw = str(task).strip().split(' ')
+                if len(raw) > 1:
+                    raw = ' '.join(raw[1:]) #remove creation date
+                    templates[text] = raw
+                    utils.save_templates(templates)
+
+        frame.erase()
+        del frame
 
     def do_load_search(self):
         searches = utils.parse_searches()

@@ -381,11 +381,40 @@ def parse_searches():
     return searches
 
 
+def parse_templates():
+    if not common.TEMPLATES_FILE.exists():
+        return {}
+
+    templates = {}
+    with open(common.TEMPLATES_FILE, 'rt', encoding="utf-8") as fd:
+        for linenr, line in enumerate(fd.readlines()):
+            if '=' not in line:
+                continue
+            name, templatedef = line.split("=", 1)
+            name = name.strip()
+            templatedef = templatedef.strip()
+            if len(name) == 0 or len(templatedef) == 0:
+                continue
+            templates[name.strip()] = templatedef.strip()
+
+    return templates
+
+
 def save_searches(searches):
     common.SEARCHES_FILE.parent.mkdir(parents=True, exist_ok=True)
     with open(common.SEARCHES_FILE, 'wt', encoding="utf-8") as fd:
         for name in sorted(searches.keys()):
             value = searches[name].strip()
+            if len(value) == 0:
+                continue
+            fd.write(f"{name} = {value}\n")
+
+
+def save_templates(templates):
+    common.TEMPLATES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(common.TEMPLATES_FILE, 'wt', encoding="utf-8") as fd:
+        for name in sorted(templates.keys()):
+            value = templates[name].strip()
             if len(value) == 0:
                 continue
             fd.write(f"{name} = {value}\n")
