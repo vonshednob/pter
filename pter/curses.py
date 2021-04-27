@@ -1221,6 +1221,8 @@ class Window:
         if self.create_from_search:
             today += utils.create_from_search(self.search)
         if self.selected_template is not None:
+            if not today.endswith(' '):
+                today += ' '
             today += self.selected_template
         text, source = self.read_text(y+1, 4, curses.COLS-8, today, select_source=frame)
         if text is not None:
