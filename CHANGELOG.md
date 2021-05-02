@@ -5,6 +5,14 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.15
+### Fixed
+- Repainting used to cause some flickering and was rather slow
+
+### Changed
+- The marker for the currently selected task is stretching over the full width
+  of the window
+
 ## 1.0.14
 ### Added
 - Support including extra configuration files (issue [#53](https://git.spacepanda.se/bold-kitty/pter/issues/53))
