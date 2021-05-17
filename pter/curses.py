@@ -102,6 +102,7 @@ class TaskLineSelectionIcon(TaskLineElement):
 class Window:
     def __init__(self, sources, conf):
         self.scr = curses.initscr()
+        self.dim = self.scr.getmaxyx()
         self.quit = False
         self.sources = sources
         self.conf = conf
@@ -277,13 +278,9 @@ class Window:
         self.task_lines = []
         self.max_widths = {}
         self.selected_task = -1
-        self.scroll_offset = 0
-        self.task_list = None
-        self.task_panel = None
-        self.search_bar = None
-        self.status_bar = None
-        self.help_bar = None
         self.selected_template = None
+        self.scroll_offset = 0
+        self.must_repaint = True
         self.sort_order = utils.build_sort_order(common.DEFAULT_SORT_ORDER)
         self.sort_order_txt = common.DEFAULT_SORT_ORDER
         self.search = Searcher('',
@@ -334,9 +331,18 @@ class Window:
         to_exit = [k for k, fnc in self.editor_key_mapping.items() if fnc == 'cancel']
         if len(to_exit) == 0:
             raise RuntimeError("No key to cancel editing")
+        list_height = self.dim[0]-4
+        if len(self.filtered_tasks) > 0:
+            self.selected_task = max(0, min(self.selected_task, len(self.filtered_tasks)-1))
+
+        if self.selected_task <= self.scroll_offset + self.scroll_margin:
+            self.scroll_offset = max(0, self.selected_task - self.scroll_margin)
+        elif self.selected_task >= self.scroll_offset + list_height - self.scroll_margin:
+            self.scroll_offset = min(max(0, len(self.filtered_tasks) - list_height),
+                                     self.selected_task - list_height + self.scroll_margin + 1)
 
     def update_color_pairs(self):
-        self.colors = {common.SETTING_COL_NORMAL: [Color(7, 0), Color(0, 7)],
+        self.colors = {common.SETTING_COL_NORMAL: [Color(7, -1), Color(0, 7)],
                        common.SETTING_COL_INACTIVE: [Color(8), None],
                        common.SETTING_COL_ERROR: [Color(1), None],
                        common.SETTING_COL_PRI_A: [Color(1), None],
@@ -459,28 +465,38 @@ class Window:
             return 0
         return next_id
 
-
     def build_screen(self):
         self.scr.attrset(self.color(common.SETTING_COL_NORMAL))
+        self.scr.erase()
         self.scr.noutrefresh()
-        dim = self.scr.getmaxyx()
-        if self.task_list is None:
-            self.task_list = curses.newwin(dim[0]-4, dim[1], 2, 0)
-            self.task_panel = curses.panel.new_panel(self.task_list)
-        self.task_list.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
-        if self.search_bar is None:
-            self.search_bar = curses.newwin(1, dim[1], 0, 0)
-        self.search_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
-        self.search_bar.addstr(0, 1, tr('(no search active)'), self.color(common.SETTING_COL_INACTIVE))
-        self.search_bar.noutrefresh()
-        if self.status_bar is None:
-            self.status_bar = curses.newwin(1, dim[1], dim[0]-2, 0)
-        self.status_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
-        self.status_bar.noutrefresh()
-        self.print_shortcut_bar()
-        self.scr.addnstr(1, 0, '─'*dim[1], dim[1])
+        self.paint_search_bar()
+        self.paint_status_bar()
+        self.paint_shortcut_bar()
+        self.scr.addstr(1, 0, '─'*self.dim[1])
+        self.scr.noutrefresh()
 
-    def print_shortcut_bar(self, actions=None, mapping=None):
+    def paint_search_bar(self):
+        self.scr.move(0, 0)
+        self.scr.clrtoeol()
+        attrs = 0
+        text = self.search.text.strip()
+        if len(text) == 0:
+            text = tr('(no search active)')
+            attrs = self.color(common.SETTING_COL_INACTIVE)
+        self.scr.addstr(0, 1, text, attrs)
+        self.scr.noutrefresh()
+
+    def paint_status_bar(self, text="", attrs=None):
+        y = self.dim[0]-2
+        self.scr.move(y, 0)
+        self.scr.clrtoeol()
+        if attrs is None:
+            attrs = self.color(common.SETTING_COL_NORMAL)
+        if len(text) > 0:
+            self.scr.addstr(y, 0, text, attrs)
+        self.scr.noutrefresh()
+
+    def paint_shortcut_bar(self, actions=None, mapping=None):
         if mapping is None:
             mapping = self.key_mapping
         if actions is None:
@@ -488,11 +504,11 @@ class Window:
                        'create-task', 'search', 'load-search', 'save-search',
                        'toggle-done', 'jump-to', 'next-item', 'prev-item']
 
-        if self.help_bar is not None:
-            del self.help_bar
-        self.help_bar = curses.newwin(1, curses.COLS, curses.LINES-1, 0)
-        self.help_bar.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
-        self.help_bar.clear()
+        y = self.dim[0]-1
+        self.scr.move(y, 0)
+        self.scr.clrtoeol()
+        self.scr.noutrefresh()
+
         x = 1
         for action in actions:
             label = self.short_name.get(action, None)
@@ -508,14 +524,14 @@ class Window:
                 keytext = f" {tr(Key.SPECIAL[keys[0]])} "
             else:
                 keytext = f" {tr(keys[0])} "
-            if x + len(keytext) + len(label) >= self.help_bar.getmaxyx()[1]:
+            if x + len(keytext) + len(label) >= self.dim[1]:
                 break
 
-            self.help_bar.addstr(0, x, keytext, self.color(common.SETTING_COL_HELP_KEY))
+            self.scr.addstr(y, x, keytext, self.color(common.SETTING_COL_HELP_KEY))
             x += len(keytext)
-            self.help_bar.addstr(0, x, label, self.color(common.SETTING_COL_HELP_TEXT))
+            self.scr.addstr(y, x, label, self.color(common.SETTING_COL_HELP_TEXT))
             x += len(label) + 1
-        self.help_bar.noutrefresh()
+        self.scr.noutrefresh()
 
     def update_sorting(self):
         new_sort_order = common.DEFAULT_SORT_ORDER
@@ -539,6 +555,7 @@ class Window:
         self.update_sorting()
         self.filtered_tasks = [(task, source) for task, source in self.tasks
                                if self.search.match(task)]
+        self.must_repaint = True
         self.rebuild_task_lines()
 
     def rebuild_task_lines(self):
@@ -664,27 +681,27 @@ class Window:
 
             self.task_lines.append(line)
 
-    def show_tasks(self):
-        list_height = self.task_list.getmaxyx()[0]
-        if len(self.filtered_tasks) > 0:
-            self.selected_task = max(0, min(self.selected_task, len(self.filtered_tasks)-1))
-
-        if self.selected_task <= self.scroll_offset + self.scroll_margin:
-            self.scroll_offset = max(0, self.selected_task - self.scroll_margin)
-        elif self.selected_task >= self.scroll_offset + list_height - self.scroll_margin:
-            self.scroll_offset = min(max(0, len(self.filtered_tasks) - list_height),
-                                     self.selected_task - list_height + self.scroll_margin + 1)
-
+    def paint_tasks(self, tasks=None):
+        """Repaint all tasks on screen.
+        If `tasks` is provided, only repaint the tasks with these numbers."""
+        list_height = self.dim[0]-4
+        y = 2
+        nr = 0
         for nr, line in enumerate(self.task_lines):
             if nr < self.scroll_offset:
                 continue
             if nr >= self.scroll_offset + list_height:
                 break
-            self.write_task(nr-self.scroll_offset, 1, nr, line)
-        self.task_list.clrtobot()
-        if len(self.filtered_tasks) == 0:
-            self.task_list.erase()
-        self.task_list.noutrefresh()
+            if tasks is not None and nr not in tasks:
+                continue
+            self.write_task(y+nr-self.scroll_offset, 0, nr, line)
+
+        if tasks is None:
+            while nr - self.scroll_offset + y <= list_height:
+                nr += 1
+                self.scr.move(y + nr - self.scroll_offset, 0)
+                self.scr.clrtoeol()
+        self.scr.noutrefresh()
 
     def date_as_str(self, text, hint=''):
         if common.TF_ALL in self.human_friendly_dates or hint in self.human_friendly_dates:
@@ -708,7 +725,7 @@ class Window:
         if is_tracked:
             baseattrs = common.SETTING_COL_TRACKING
 
-        maxwidth = self.task_list.getmaxyx()[1]-1
+        maxwidth = self.dim[1]
 
         def print_element(y, x, maxwidth, element, align, extra):
             cut_off = False
@@ -744,25 +761,25 @@ class Window:
                 cut_off = True
                 elem = elem[:maxwidth]
 
-            self.task_list.addstr(y, x, elem, self.color(element.color, is_selected, baseattrs))
+            self.scr.addstr(y, x, elem, self.color(element.color, is_selected, baseattrs))
 
             if cut_off:
                 attrs = common.SETTING_COL_OVERFLOW
-                self.task_list.addstr(y, x+maxwidth-len(self.overflow_marker[1]),
-                                      self.overflow_marker[1],
-                                      self.color(attrs, is_selected, baseattrs))
+                self.scr.addstr(y, x+maxwidth-len(self.overflow_marker[1]),
+                                self.overflow_marker[1],
+                                self.color(attrs, is_selected, baseattrs))
             return elem
 
         def print_group(y, x, maxwidth, group, align, extra):
             line = ''
 
             if extra is not None and extra[0] is not None:
-                self.task_list.addstr(y, x + len(line), extra[0], self.color(baseattrs, is_selected))
+                self.scr.addstr(y, x + len(line), extra[0], self.color(baseattrs, is_selected))
                 line = extra[0]
 
             if align is not None and align.endswith('>'):
                 spacing = align[0] * min(maxwidth - len(line), self.max_widths[group.name] - len(' '.join([e.content for e in group.elements])))
-                self.task_list.addstr(y, x + len(line), spacing, self.color(baseattrs, is_selected))
+                self.scr.addstr(y, x + len(line), spacing, self.color(baseattrs, is_selected))
                 line += spacing
 
             cut_off = False
@@ -773,7 +790,7 @@ class Window:
                     if len(line) + 1 >= maxwidth:
                         cut_off = True
                     else:
-                        self.task_list.addstr(y, x + len(line), " ", self.color(baseattrs, is_selected))
+                        self.scr.addstr(y, x + len(line), " ", self.color(baseattrs, is_selected))
                         line += " "
 
                 cut_off = cut_off or len(line) >= maxwidth
@@ -791,15 +808,17 @@ class Window:
             if not cut_off and align is not None and align.endswith('<'):
                 if len(line) < self.max_widths[group.name]:
                     spacing = align[0] * min(maxwidth-len(line), self.max_widths[group.name]-len(line))
-                    self.task_list.addstr(y, x + len(line), spacing, self.color(baseattrs, is_selected))
+                    self.scr.addstr(y, x + len(line), spacing, self.color(baseattrs, is_selected))
                     line += spacing
 
             if not cut_off and extra is not None and extra[1] is not None and len(line) + 1 < maxwidth:
-                self.task_list.addstr(y, x + len(line), extra[1], self.color(baseattrs, is_selected))
+                self.scr.addstr(y, x + len(line), extra[1], self.color(baseattrs, is_selected))
             return line
 
-        self.task_list.move(y, x)
-        self.task_list.clrtoeol()
+        self.scr.move(y, x)
+        self.scr.clrtoeol()
+        self.scr.noutrefresh()
+
         for token in self.task_format:
             align = None
             extra = None
@@ -817,8 +836,33 @@ class Window:
             if x >= maxwidth:
                 break
 
+        if x < maxwidth:
+            self.scr.addstr(y, x, ' '*(maxwidth-x), self.color(baseattrs, is_selected))
+
+    def recalculate_scrolling(self):
+        selected_task = self.selected_task
+        scroll_offset = self.scroll_offset
+
+        list_height = self.dim[0]-4
+        if len(self.filtered_tasks) > 0:
+            selected_task = max(0, min(selected_task, len(self.filtered_tasks)-1))
+
+        if selected_task <= scroll_offset + self.scroll_margin:
+            scroll_offset = max(0, selected_task - self.scroll_margin)
+        elif selected_task >= scroll_offset + list_height - self.scroll_margin:
+            scroll_offset = min(max(0, len(self.filtered_tasks) - list_height),
+                                     selected_task - list_height + self.scroll_margin + 1)
+
+        if scroll_offset != self.scroll_offset:
+            self.must_repaint = True
+        changed = selected_task != self.selected_task or scroll_offset != self.scroll_offset
+        self.selected_task = selected_task
+        self.scroll_offset = scroll_offset
+        return changed
+
     def run(self):
         self.build_screen()
+        curses.doupdate()
         self.update_tasks()
 
         while not self.quit:
@@ -828,15 +872,17 @@ class Window:
                     source.parse()
                     source_changed = True
             if source_changed:
+                self.must_repaint = True
                 self.update_tasks()
 
-            self.show_tasks()
-            curses.panel.update_panels()
+            if self.recalculate_scrolling() or self.must_repaint:
+                self.paint_tasks(self.must_repaint if isinstance(self.must_repaint, list) else None)
+                self.must_repaint = False
+
             curses.doupdate()
 
             key = Key.read(self.scr)
-            self.status_bar.clear()
-            self.status_bar.noutrefresh()
+            self.paint_status_bar()
 
             if key == Key.RESIZE:
                 self.do_refresh_screen()
@@ -846,14 +892,14 @@ class Window:
                 self.functions[self.key_mapping[str(key)]]()
 
         self.scr.clear()
+        self.scr.refresh()
 
     def read_jump_to(self, start):
-        self.status_bar.clear()
-        self.status_bar.addstr(0, 0, tr('Jump to:') + ' ')
-        self.status_bar.refresh()
-        number = self.read_text(curses.LINES-2, 9, text=start)
-        self.status_bar.erase()
-        self.status_bar.noutrefresh()
+        text = tr('Jump to:') + ' '
+        self.paint_status_bar(text)
+        curses.doupdate()
+        number = self.read_text(self.dim[0]-2, len(text), text=start)
+        self.paint_status_bar()
 
         if number is not None and number.isdigit():
             number = int(number)
@@ -869,7 +915,7 @@ class Window:
             self.search.text = text
             self.search.parse()
             self.apply_search()
-            self.show_tasks()
+            self.paint_tasks()
 
         new_search = self.read_text(0, 0, text=self.search.text, callback=update)
 
@@ -880,43 +926,52 @@ class Window:
             self.search.text = new_search.strip()
             self.search.parse()
         self.apply_search()
-        self.show_tasks()
-        self.refresh_search_bar()
+        self.paint_search_bar()
+        self.paint_tasks()
 
-    def refresh_search_bar(self):
-        self.search_bar.erase()
-        text = self.search.text.strip()
-        if len(text) == 0:
-            self.search_bar.addstr(0, 1, tr('(no search active)'), self.color(common.SETTING_COL_INACTIVE))
-        else:
-            self.search_bar.addstr(0, 1, text[:curses.COLS-2])
-        self.search_bar.refresh()
-
-    def read_text(self, y, x, cols=None, text='', callback=None, select_source=None):
+    def read_text(self, y, x, cols=None, text='', callback=None, select_source=False, box=False, title=None):
         if cols is None:
             cols = curses.COLS-x-1
-        editor = curses.newwin(1, cols, y, x)
+        if box:
+            editor = curses.newwin(3, cols, y, x)
+        else:
+            editor = curses.newwin(1, cols, y, x)
         editor.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
+        editor.erase()
+        editor.noutrefresh()
+
+        if box:
+            editor.border()
+            if title is not None and cols - 8 > len(title):
+                editor.addstr(0, 2, f'┤{title}├')
+            y = 1
+            x = 1
+            max_width = cols-3
+        else:
+            y = 0
+            x = 0
+            max_width = cols-1
+        editor.noutrefresh()
+
         scroll = 0
         margin = 5
-        max_width = cols-1
         curpos = len(text)
         source = self.sources[0]
 
-        show_select_source = select_source is not None and len(self.sources) > 1
+        show_select_source = select_source and box and len(self.sources) > 1
 
         shortcuts = ['cancel', 'submit-input']
         if show_select_source:
             shortcuts.append('select-file')
-        self.print_shortcut_bar(shortcuts, self.editor_key_mapping)
+        self.paint_shortcut_bar(shortcuts, self.editor_key_mapping)
 
         def refresh_source_display():
             if not show_select_source:
                 return
             right = cols - 3 - len(source.displayname)
-            select_source.addstr(2, 1, "─"*(cols-2))
-            select_source.addstr(2, right, f"┤{source.displayname}├")
-            select_source.refresh()
+            editor.addstr(2, 1, "─"*(cols-2))
+            editor.addstr(2, right, f"┤{source.displayname}├")
+            editor.noutrefresh()
 
         refresh_source_display()
 
@@ -927,18 +982,19 @@ class Window:
 
         while True:
             unchanged = text
-            editor.erase()
+            editor.addstr(y, x, " "*(cols-2))
+            editor.noutrefresh()
             if curpos >= scroll + max_width - 2 - margin:
                 scroll = min(curpos-margin, curpos - max_width + margin + 2)
             elif curpos <= scroll + margin:
                 scroll = max(0, curpos - margin)
             if scroll > 0:
-                editor.addstr(0, 0, self.overflow_marker[0], self.color(common.SETTING_COL_OVERFLOW))
+                editor.addstr(y, x, self.overflow_marker[0], self.color(common.SETTING_COL_OVERFLOW))
             if len(text)-scroll >= max_width-1:
-                editor.addstr(0, max_width-len(self.overflow_marker[1]),
+                editor.addstr(y, x+max_width-len(self.overflow_marker[1]),
                               self.overflow_marker[1], self.color(common.SETTING_COL_OVERFLOW))
-            editor.addstr(0, 1, text[scroll:scroll+max_width-2])
-            editor.move(0, 1 + curpos-scroll)
+            editor.addstr(y, x + 1, text[scroll:scroll+max_width-2])
+            editor.move(y, x + 1 + curpos - scroll)
             editor.refresh()
 
             key = Key.read(self.scr)
@@ -949,7 +1005,7 @@ class Window:
                 if fnc == 'cancel':
                     text = None
                     break
-                elif fnc == 'del-left':
+                elif fnc == 'del-left' and curpos > 0:
                     text = text[:curpos-1] + text[curpos:]
                     curpos = max(0, curpos-1)
                 elif fnc == 'del-right':
@@ -973,6 +1029,11 @@ class Window:
                         candidates = [s for s in self.sources if s.displayname == sourcename]
                         if len(candidates) == 1:
                             source = candidates[0]
+                    self.scr.touchwin()
+                    self.paint_shortcut_bar(shortcuts, self.editor_key_mapping)
+                    self.scr.noutrefresh()
+                    editor.touchwin()
+                    editor.noutrefresh()
                     refresh_source_display()
                 elif fnc == 'submit-input':
                     break
@@ -984,13 +1045,14 @@ class Window:
                 callback(text)
 
         try:
-            curses.curs_set(False)
+            curses.curs_set(0)
         except:
             pass
-        del editor
-        curses.panel.update_panels()
 
-        self.print_shortcut_bar()
+        del editor
+        self.scr.touchwin()
+        self.paint_shortcut_bar()
+        self.scr.noutrefresh()
 
         if select_source:
             return text, source
@@ -1005,7 +1067,7 @@ class Window:
         if lblfnc is None:
             lblfnc = lambda x: x
 
-        self.print_shortcut_bar(['cancel', 'select-item', 'next-item', 'prev-item', 'jump-to'])
+        self.paint_shortcut_bar(['cancel', 'select-item', 'next-item', 'prev-item', 'jump-to'])
 
         options = items[:]
         options.sort(key=lblfnc)
@@ -1092,39 +1154,52 @@ class Window:
         curses.panel.update_panels()
         del panel
         del frame
-        self.print_shortcut_bar()
-        curses.doupdate()
 
         if selection is None:
             return None
         return options[selection]
 
-
     def do_quit(self):
         self.quit = True
 
     def do_next_task(self, skip=1):
-        self.selected_task = min(self.selected_task + skip, len(self.filtered_tasks)-1)
+        selected_task = min(self.selected_task + skip, len(self.filtered_tasks)-1)
+        if selected_task != self.selected_task:
+            self.must_repaint = [selected_task, self.selected_task]
+        self.selected_task = selected_task
 
     def do_prev_task(self, skip=1):
-        self.selected_task = max(self.selected_task - skip, 0)
+        selected_task = max(self.selected_task - skip, 0)
+        if selected_task != self.selected_task:
+            self.must_repaint = [selected_task, self.selected_task]
+        self.selected_task = selected_task
 
     def do_half_page_up(self):
-        self.do_prev_task(skip=(self.task_list.getmaxyx()[0] // 2)-1)
+        self.do_prev_task(skip=(self.dim[0] // 2)-1)
+        if self.must_repaint:
+            self.must_repaint = True
 
     def do_half_page_down(self):
-        self.do_next_task(skip=(self.task_list.getmaxyx()[0] // 2)-1)
+        self.do_next_task(skip=(self.dim[0] // 2)-1)
+        if self.must_repaint:
+            self.must_repaint = True
 
     def do_go_last_task(self):
         self.do_next_task(skip=len(self.filtered_tasks))
+        if self.must_repaint:
+            self.must_repaint = True
 
     def do_go_first_task(self):
         self.do_prev_task(skip=len(self.filtered_tasks))
+        if self.must_repaint:
+            self.must_repaint = True
 
     def do_jump_to(self, init=''):
         pos = self.read_jump_to(init)
         if pos is not None:
-            self.selected_task = min(max(0, pos-1), len(self.filtered_tasks))
+            selected_task = min(max(0, pos-1), len(self.filtered_tasks))
+            self.must_repaint = selected_task != self.selected_task
+            self.selected_task = selected_task
 
     def do_start_search(self):
         self.read_search_input()
@@ -1140,6 +1215,10 @@ class Window:
 
         contexts.sort()
         context = self.select_one(contexts, tr("Select Context"))
+        self.scr.touchwin()
+        self.paint_shortcut_bar()
+        self.scr.noutrefresh()
+        curses.doupdate()
 
         if context is not None:
             context = '@' + context
@@ -1148,8 +1227,7 @@ class Window:
             self.search.text += context
             self.search.parse()
             self.apply_search()
-            self.show_tasks()
-            self.refresh_search_bar()
+            self.paint_search_bar()
 
     def do_search_project(self):
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
@@ -1162,6 +1240,9 @@ class Window:
 
         projects.sort()
         project = self.select_one(projects, tr("Select Project"))
+        self.scr.touchwin()
+        self.paint_shortcut_bar()
+        self.scr.noutrefresh()
 
         if project is not None:
             project = '+' + project
@@ -1170,8 +1251,7 @@ class Window:
             self.search.text += project
             self.search.parse()
             self.apply_search()
-            self.show_tasks()
-            self.refresh_search_bar()
+            self.paint_search_bar()
 
     def do_toggle_done(self):
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
@@ -1182,10 +1262,8 @@ class Window:
             utils.toggle_done(task, self.clear_contexts)
             source.save(safe=self.safe_save)
         else:
-            self.status_bar.addstr(0, 0,
-                                   tr("Not changed: task was modified in the background"),
-                                   self.color(common.SETTING_COL_ERROR))
-            self.status_bar.noutrefresh()
+            self.paint_status_bar(tr("Not changed: task was modified in the background"),
+                                  self.color(common.SETTING_COL_ERROR))
         self.update_tasks()
 
     def do_toggle_hidden(self):
@@ -1197,24 +1275,14 @@ class Window:
             utils.toggle_hidden(task)
             source.save(safe=self.safe_save)
         else:
-            self.status_bar.addstr(0, 0,
-                                   tr("Not changed: task was modified in the background"),
-                                   self.color(common.SETTING_COL_ERROR))
-            self.status_bar.noutrefresh()
+            self.paint_status_bar(tr("Not changed: task was modified in the background"),
+                                  self.color(common.SETTING_COL_ERROR))
         self.update_tasks()
 
     def do_create_task(self):
         source = self.sources[0]
         y = curses.LINES//2 - 1
-        frame = curses.newwin(3, curses.COLS-6, y, 3)
-        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
-        frame.erase()
-        frame.border()
-        panel = curses.panel.new_panel(frame)
-        label = tr('New Task')
-        if curses.COLS-8 > len(label):
-            frame.addstr(0, 2, f'┤{label}├')
-        frame.refresh()
+
         today = ''
         if self.add_creation_date:
             today = datetime.datetime.now().strftime(Task.DATE_FMT) + ' '
@@ -1224,15 +1292,16 @@ class Window:
             if not today.endswith(' '):
                 today += ' '
             today += self.selected_template
-        text, source = self.read_text(y+1, 4, curses.COLS-8, today, select_source=frame)
+        text = None
+        source = None
+        text, source = self.read_text(y, 4, self.dim[1]-8, today,
+                                      select_source=True, box=True, title=tr("New Task"))
         if text is not None:
             if self.auto_id and not any([word.startswith('id:') for word in text.split(' ')]):
                 text += ' id:#'
             text = utils.auto_task_id(self.sources, text)
             text = utils.dehumanize_dates(text)
-        frame.erase()
-        del panel
-        del frame
+
         if text is not None and len(text.strip()) > 0:
             task = Task(text)
             if source.refresh():
@@ -1243,20 +1312,14 @@ class Window:
             source.update_contexts_and_projects()
             self.search.update_sources(self.sources)
             self.update_tasks()
-        self.show_tasks()
+        self.scr.touchwin()
+        self.scr.noutrefresh()
 
     def do_edit_task(self):
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
             return
-        y = curses.LINES//2 - 1
-        frame = curses.newwin(3, curses.COLS-6, y, 3)
-        frame.bkgdset(' ', self.color(common.SETTING_COL_NORMAL))
-        frame.erase()
-        frame.border()
-        label = tr('Edit Task')
-        if curses.COLS-8 > len(label):
-            frame.addstr(0, 2, f'┤{label}├')
-        frame.refresh()
+        y = self.dim[0]//2 - 1
+
         task, source = self.filtered_tasks[self.selected_task]
         if source.refresh():
             source.parse()
@@ -1266,18 +1329,15 @@ class Window:
             if len(these) > 0:
                 task = these[0]
             else:
-                frame.erase()
-                self.status_bar.addstr(0, 0,
-                                       tr("Cannot edit: task was modified in the background"),
-                                       self.color(common.SETTING_COL_ERROR))
-                self.status_bar.noutrefresh()
+                self.paint_status_bar(tr("Cannot edit: task was modified in the background"),
+                                      self.color(common.SETTING_COL_ERROR))
                 return
-        text = self.read_text(y+1, 4, curses.COLS-8, str(task).strip())
+        text = self.read_text(y, 4, self.dim[1]-8, str(task).strip(),
+                              box=True, title=tr("Edit task"))
         if text is not None:
             text = utils.auto_task_id(self.sources, text)
             text = utils.dehumanize_dates(text)
-        frame.erase()
-        del frame
+
         if text is not None and text.strip() != str(task).strip():
             task = utils.ensure_up_to_date(task)
             if task is not None:
@@ -1286,10 +1346,8 @@ class Window:
                 source.update_contexts_and_projects()
                 self.search.update_sources(self.sources)
             else:
-                self.status_bar.addstr(0, 0,
-                                       tr("Not changed: task was modified in the background"),
-                                       self.color(common.SETTING_COL_ERROR))
-                self.status_bar.noutrefresh()
+                self.paint_status_bar(tr("Not changed: task was modified in the background"),
+                                      self.color(common.SETTING_COL_ERROR))
             self.update_tasks()
 
     def do_load_template(self):
@@ -1336,9 +1394,12 @@ class Window:
             return
         names = [name for name in sorted(searches.keys())]
         name = self.select_one(names, tr('Load Search'), autoselect=False)
+        self.scr.touchwin()
+        self.paint_shortcut_bar()
+        self.scr.noutrefresh()
         if names is not None and name in searches:
             self.search.text = searches[name]
-            self.refresh_search_bar()
+            self.paint_search_bar()
             self.search.parse()
             self.apply_search()
 
@@ -1376,10 +1437,8 @@ class Window:
         task, source = self.filtered_tasks[self.selected_task]
         task = utils.ensure_up_to_date(task)
         if task is None:
-            self.status_bar.addstr(0, 0,
-                                   tr("Not tracked: task was modified in the background"),
-                                   self.color(common.SETTING_COL_ERROR))
-            self.status_bar.noutrefresh()
+            self.paint_status_bar(tr("Not tracked: task was modified in the background"),
+                                  self.color(common.SETTING_COL_ERROR))
             self.update_tasks()
             return
         
@@ -1390,8 +1449,10 @@ class Window:
 
     def do_refresh_screen(self):
         curses.update_lines_cols()
+        self.dim = self.scr.getmaxyx()
+        self.must_repaint = True
         self.build_screen()
-        self.refresh_search_bar()
+        self.paint_search_bar()
 
     def do_open_url(self):
         if len(self.filtered_tasks) == 0 or self.selected_task >= len(self.filtered_tasks):
@@ -1418,6 +1479,9 @@ class Window:
             urls.append(url)
 
         url = self.select_one(urls, tr("Select URL"))
+        self.scr.touchwin()
+        self.paint_shortcut_bar()
+        self.scr.noutrefresh()
         if url is not None:
             webbrowser.open(url)
 
@@ -1445,10 +1509,8 @@ class Window:
             source.save(safe=self.safe_save)
             self.do_delegation_action(task)
         else:
-            self.status_bar.addstr(0, 0,
-                                   tr("Not delegated: task was modified in the background"),
-                                   self.color(common.SETTING_COL_ERROR))
-            self.status_bar.noutrefresh()
+            self.paint_status_bar(tr("Not delegated: task was modified in the background"),
+                                  self.color(common.SETTING_COL_ERROR))
         self.update_tasks()
 
     def do_delegation_action(self, task):
@@ -1501,7 +1563,7 @@ class Window:
                     frame = curses.newwin(curses.LINES-1, curses.COLS, 0, 0)
                     frame.clear()
                     frame.bkgd(' ', self.color(common.SETTING_COL_NORMAL))
-                    self.print_shortcut_bar(['quit',])
+                    self.paint_shortcut_bar(['quit',])
                 else:
                     frame.clear()
                 maxscroll = max(0, len(lines) - frame.getmaxyx()[0] + 3)
