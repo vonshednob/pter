@@ -249,6 +249,8 @@ class Window:
                            'submit-input': 'Apply changes',
                            'select-file': 'Select file',
                            'delegate': 'Delegate task',
+                           'refresh-screen': 'Refresh screen',
+                           'reload-tasks': 'Reload todo files',
                            }
 
         curses.start_color()
@@ -690,6 +692,8 @@ class Window:
             self.write_task(y+nr-self.scroll_offset, 0, nr, line)
 
         if tasks is None:
+            if len(self.filtered_tasks) == 0:
+                nr -= 1
             while nr - self.scroll_offset + y <= list_height:
                 nr += 1
                 self.scr.move(y + nr - self.scroll_offset, 0)
@@ -837,14 +841,17 @@ class Window:
         scroll_offset = self.scroll_offset
 
         list_height = self.dim[0]-4
-        if len(self.filtered_tasks) > 0:
+        if len(self.filtered_tasks) == 0:
+            selected_task = None
+            scroll_offset = 0
+        else:
             selected_task = max(0, min(selected_task, len(self.filtered_tasks)-1))
 
-        if selected_task <= scroll_offset + self.scroll_margin:
-            scroll_offset = max(0, selected_task - self.scroll_margin)
-        elif selected_task >= scroll_offset + list_height - self.scroll_margin:
-            scroll_offset = min(max(0, len(self.filtered_tasks) - list_height),
-                                     selected_task - list_height + self.scroll_margin + 1)
+            if selected_task <= scroll_offset + self.scroll_margin:
+                scroll_offset = max(0, selected_task - self.scroll_margin)
+            elif selected_task >= scroll_offset + list_height - self.scroll_margin:
+                scroll_offset = min(max(0, len(self.filtered_tasks) - list_height),
+                                         selected_task - list_height + self.scroll_margin + 1)
 
         if scroll_offset != self.scroll_offset:
             self.must_repaint = True
@@ -858,13 +865,24 @@ class Window:
         curses.doupdate()
         self.update_tasks()
 
+        self.scr.timeout(10000)
+        then = datetime.datetime.now()
+
         while not self.quit:
             source_changed = False
+
+            # detect changes of the sources
             for source in self.sources:
                 if source.refresh():
                     source.parse()
                     source_changed = True
-            if source_changed:
+
+            # detect the passing of midnight
+            now = datetime.datetime.now()
+            past_midnight = then.day != now.day
+            then = now
+
+            if source_changed or past_midnight:
                 self.must_repaint = True
                 self.update_tasks()
 
@@ -875,13 +893,15 @@ class Window:
             curses.doupdate()
 
             key = Key.read(self.scr)
-            self.paint_status_bar()
 
             if key == Key.RESIZE:
                 self.do_refresh_screen()
-            elif not key.special and str(key) in '123456789':
+            elif not key.special and str(key) in string.digits:
                 self.do_jump_to(str(key))
             elif str(key) in self.key_mapping and self.key_mapping[str(key)] in self.functions:
+                # clear status bar
+                self.paint_status_bar()
+
                 self.functions[self.key_mapping[str(key)]]()
 
         self.scr.clear()

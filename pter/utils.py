@@ -241,7 +241,7 @@ def update_spent(task):
 
         return True
 
-    return False
+    return True
 
 
 def human_friendly_date(text):
