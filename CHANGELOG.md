@@ -5,6 +5,11 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 1.0.17
+### Fixed
+- Clearing a search that resulted in 0 visible tasks would crash pter
+- Be consistent and accept relative paths as well as the `~/` (user home) notion
+
 ## 1.0.16
 ### Added
 - Detect the passing of midnight

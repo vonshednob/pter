@@ -845,6 +845,8 @@ class Window:
             selected_task = None
             scroll_offset = 0
         else:
+            if selected_task is None:
+                selected_task = 0
             selected_task = max(0, min(selected_task, len(self.filtered_tasks)-1))
 
             if selected_task <= scroll_offset + self.scroll_margin:

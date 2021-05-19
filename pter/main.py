@@ -3,6 +3,7 @@ import configparser
 import pathlib
 import sys
 import locale
+import io
 
 from pytodotxt import TodoTxt
 
@@ -76,15 +77,21 @@ def run():
             print(tr("You have to provide exactly one todo.txt file."), file=sys.stderr)
             return 1
 
+        filename = pathlib.Path(args.filename[0]).expanduser().resolve()
+
         text = args.new_task
         if text == '-':
             text = sys.stdin.read()
 
         if len(text) == 0:
             return -1
+
+        mode = "r+t"
+        if not filename.exists():
+            mode = "wt"
         
-        with open(args.filename[0], "r+t", encoding="utf-8") as fd:
-            fd.read()
+        with open(args.filename[0], mode, encoding="utf-8") as fd:
+            fd.seek(0, io.SEEK_END)
             for line in text.split("\n"):
                 if len(line.strip()) == 0:
                     continue
