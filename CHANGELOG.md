@@ -5,7 +5,7 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
-## Not released yet
+## 1.0.16
 ### Added
 - Detect the passing of midnight
 - Commandline parameter "-n" to add a task directly
