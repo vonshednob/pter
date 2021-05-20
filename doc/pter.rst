@@ -580,6 +580,7 @@ In the list of tasks, the following controls are also available:
  - "p": search for a project of the currently selected task
  - "q": quit the program
  - "l": load a named search
+ - "L": load a named task template
  - "s": save the current search
  - "u": open a URL listed in the selected task
  - "t": Start/stop time tracking of the selected task
@@ -891,6 +892,31 @@ Here are some useful example search queries::
   Due this week = done:no duebefore:mon
   Done today = done:yes completed:0
   Open tasks = done:no
+
+
+Task Templates
+==============
+
+When using todo.txt files for project planning it can be very tedious to type
+due dates, time estimates project and context, tickler values, custom tags, 
+etc for every task. Another scenario is if a certain type of task comes up on 
+a regular basis, e.g. bugfixes.
+
+To get around typing out the task every time, you can edit a file stored in your
+configuration folder ``~/.config/pter/templates.txt``. The syntax is identical to
+the ``searches.txt`` file. 
+
+Each line in that file is one saved template in the form ``name = task template``.
+
+The default keyboard shortcut to load a template is "L", to set no template, select
+the ``None`` template. Once a template has been selected any new task created will
+contain the template text when editing starts.
+
+Here are some useful example search queries::
+
+  Paper revision = @paper +revision due:+7d estimate:
+  Bug fix = (A) @programming due:+2d estimate: git:
+  Project X = @work +projectx due:2021-04-11 estimate: 
 
 
 Time Tracking
