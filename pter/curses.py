@@ -229,8 +229,8 @@ class Window:
                            'half-page-down': 'Half page down',
                            'search': 'Search',
                            'open-url': 'Open URL',
-                           'load-template': 'Load template',
-                           'save-template': 'Save template',
+                           'load-template': 'Load task template',
+                           'save-template': 'Save task as template',
                            'load-search': 'Load search',
                            'save-search': 'Save search',
                            'search-context': 'Search for context of this task',
@@ -1549,7 +1549,7 @@ class Window:
         edt_fncs = ['toggle-hidden', 'toggle-done', 'edit-task', 'create-task',
                     'toggle-tracking', 'delegate']
         search_fncs = ['search', 'load-search', 'save-search', 'search-context', 'search-project']
-        meta_fncs = ['show-help', 'open-manual', 'load-template', 'quit', 'cancel', 'refresh-screen',
+        meta_fncs = ['show-help', 'open-manual', 'save-template', 'load-template', 'quit', 'cancel', 'refresh-screen',
                      'reload-tasks']
         other_fncs = ['open-url']
 

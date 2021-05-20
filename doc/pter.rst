@@ -587,8 +587,9 @@ In the list of tasks, the following controls are also available:
  - "p": search for a project of the currently selected task
  - "q": quit the program
  - "l": load a named search
- - "L": load a named task template
  - "s": save the current search
+ - "L": load a named task template
+ - "S": Save a task as a named template
  - "u": open a URL listed in the selected task
  - "t": Start/stop time tracking of the selected task
  - ">": Delegate the selected task
@@ -911,13 +912,14 @@ a regular basis, e.g. bugfixes.
 
 To get around typing out the task every time, you can edit a file stored in your
 configuration folder ``~/.config/pter/templates.txt``. The syntax is identical to
-the ``searches.txt`` file. 
+the ``searches.txt`` file. Alternatively an existing task can be saved as a template.
 
 Each line in that file is one saved template in the form ``name = task template``.
 
 The default keyboard shortcut to load a template is "L", to set no template, select
-the ``None`` template. Once a template has been selected any new task created will
-contain the template text when editing starts.
+the ``None`` template. To save an existing task the default key is "S". Once a 
+template has been selected any new task created will contain the template text when
+editing starts.
 
 Here are some useful example search queries::
 
