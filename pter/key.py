@@ -15,7 +15,7 @@ class Key:
                '<return>': '⏎',  # ↵ ↲
                '<pgup>': 'PgUp',  # ⇞
                '<pgdn>': 'PgDn',  # ⇟
-               '<space>': '␣',
+               ' ': '␣',
                '<tab>': '⇥',
                '<f1>': 'F1',
                '<f2>': 'F2',
@@ -42,7 +42,7 @@ class Key:
     END = '<end>'
     RETURN = '<return>'
     ESCAPE = '<escape>'
-    SPACE = '<space>'
+    SPACE = ' '
     TAB = '<tab>'
     F1 = '<f1>'
     F2 = '<f2>'
@@ -57,6 +57,7 @@ class Key:
     F11 = '<f11>'
     F12 = '<f12>'
     RESIZE = '<resize>'
+    TIMEOUT = '<timeout>'
 
     def __init__(self, value, special=False):
         self.value = value
@@ -66,8 +67,14 @@ class Key:
     def read(cls, stdscr):
         try:
             value = stdscr.get_wch()
+            if value == -1:
+                return Key(Key.TIMEOUT, special=True)
             return Key.parse(value)
-        except (KeyboardInterrupt, curses.error):
+        except curses.error as exc:
+            if str(exc) == 'no input':
+                return Key(Key.TIMEOUT, special=True)
+            return Key('C', special=True)
+        except KeyboardInterrupt:
             return Key('C', special=True)
         except EOFError:
             return Key('D', special=True)
@@ -132,6 +139,12 @@ class Key:
 
             if value in "\n\r":
                 return Key(Key.RETURN, special=True)
+
+            if value == ' ':
+                return Key(Key.SPACE)
+
+            if value == "\t":
+                return Key(Key.TAB)
 
             if ctrlkey in ['^H', '^?']:
                 return Key(Key.BACKSPACE, special=True)

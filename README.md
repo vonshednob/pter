@@ -39,10 +39,6 @@ to follow:
     cd pter
     pip install .
 
-There is a man-page available, but `pip` won’t install it by default (it
-doesn’t know where to). If you want to, you can just copy it from `man/pter.1`
-to your man-page folder (usually `~/.local/share/man/man1`).
-
 
 ## Using pter
 

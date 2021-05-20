@@ -10,8 +10,8 @@ Synopsis
 
 ::
 
-  pter [-h] [-v] [-u] [-c configuration] filename [filename ...]
-  qpter [-h] [-v] [-u] [-a] [-c configuration] filename [filename ...]
+  pter [-h] [-v] [-u] [-n task] [-c configuration] filename [filename ...]
+  qpter [-h] [-v] [-u] [-a] [-n task] [-c configuration] filename [filename ...]
 
 
 Description
@@ -55,6 +55,13 @@ Options
   ``-u``
     Check whether a new version of pter is available on pypi (requires an
     internet connection).
+
+  ``-n task``
+    Add ``task`` to the todo.txt file. The advantage of using this over
+    just ``echo "task" >> todo.txt`` is that relative dates are properly
+    expanded (see `Relative Dates`_).
+    If you provide ``-`` instead of a task, the task will be read from
+    stdin. Multiple tasks can be added, one per line.
 
   ``-a``
     Only available for qpter: either start qpter, immediately open the New
