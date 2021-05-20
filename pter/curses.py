@@ -1547,9 +1547,9 @@ class Window:
         nav_fncs = ['next-item', 'prev-item', 'half-page-up', 'half-page-down',
                     'first-item', 'last-item', 'jump-to']
         edt_fncs = ['toggle-hidden', 'toggle-done', 'edit-task', 'create-task',
-                    'toggle-tracking', 'delegate']
+                    'toggle-tracking', 'delegate', 'save-template', 'load-template']
         search_fncs = ['search', 'load-search', 'save-search', 'search-context', 'search-project']
-        meta_fncs = ['show-help', 'open-manual', 'save-template', 'load-template', 'quit', 'cancel', 'refresh-screen',
+        meta_fncs = ['show-help', 'open-manual', 'quit', 'cancel', 'refresh-screen',
                      'reload-tasks']
         other_fncs = ['open-url']
 
