@@ -1549,7 +1549,7 @@ class Window:
         edt_fncs = ['toggle-hidden', 'toggle-done', 'edit-task', 'create-task',
                     'toggle-tracking', 'delegate']
         search_fncs = ['search', 'load-search', 'save-search', 'search-context', 'search-project']
-        meta_fncs = ['show-help', 'open-manual', 'quit', 'cancel', 'refresh-screen',
+        meta_fncs = ['show-help', 'open-manual', 'load-template', 'quit', 'cancel', 'refresh-screen',
                      'reload-tasks']
         other_fncs = ['open-url']
 
