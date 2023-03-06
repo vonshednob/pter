@@ -6,6 +6,15 @@ The format is based on [Keep a changelog](https://keepachangelog.com/) and the v
 [Semantic Versioning](https://semver.org).
 
 
+## 3.6.0
+### Added
+- Support for key sequences for some functions ([#3](https://codeberg.org/vonshednob/pter/issues/3))
+- `show-related` functionality (comes with `related-show-self` configuration option; [#2](https://codeberg.org/vonshednob/pter/issues/2))
+
+### Fixed
+- Fixed some typos and ambiguities in the documentation
+
+
 ## 3.5.0
 ### Added
 - New function `clear-search`, which is bound to `^` by default ([#27](https://github.com/vonshednob/pter/issues/27))

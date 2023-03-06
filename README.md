@@ -79,7 +79,7 @@ todo.txt file:
 
 # Where did the source code go?
 
-The original idea to keep this project at github was nout the greatest idea and I’ve 
+The original idea to keep this project at github was not the greatest idea and I’ve 
 moved it over to [codeberg](https://codeberg.org/vonshednob/pter).
 
 This placeholder remains though to keep track of the remaining issues (and 
