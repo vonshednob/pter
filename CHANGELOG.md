@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.6.1
+### Fixed
+- When scrolling past the end of list of tasks pter could crash (related to key sequences)
+
 
 ## 3.6.0
 ### Added
