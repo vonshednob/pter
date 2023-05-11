@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+
+## 3.7.0
+### Changed
+- When using templates, the initial cursor position will be after the creation date or at the start of the field
+
+### Added
+- When editing a task you can `Tab` through not-filled in keys, like `due:`
+
+
 ## 3.6.1
 ### Fixed
 - When scrolling past the end of list of tasks pter could crash (related to key sequences)
