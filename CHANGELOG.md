@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.8.0
+### Added
+- Archiving is now a thing. Default key binding for `archive` function is `%`
+- Archive location can be configured, see `archive-is` configuration option
+- New function `edit-file-external`, by default not mapped to a key
+
+### Fixed
+- Trash file access is more forgiving and won't crash pter
+
 
 ## 3.7.0
 ### Changed
