@@ -33,6 +33,10 @@ If you want to use the Qt GUI qpter, you have to install PyQt5:
 
     pip install PyQt5
 
+### Install from AUR
+
+If you are using Archlinux or a derivative, you can install pter from the
+AUR, for example via `yay -S pter`.
 
 ## Using pter
 

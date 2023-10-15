@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.9.0
+### Added
+- `files` option in `General` section. These files will be opened if you don't provide files on the commandline.
+- Support for detailed notes per task via the `note:` tag
+
+### Fixed
+- Desktop file `pter.desktop` can now actually work (due to `files` option in `General`, see above)
+
+
 ## 3.8.0
 ### Added
 - Archiving is now a thing. Default key binding for `archive` function is `%`
