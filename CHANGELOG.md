@@ -5,6 +5,18 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.10.0
+### Changed
+- `[Include]` section in configuration file is now deprecated
+
+### Added
+- `includes` option in `General` section of the configuration file. This is the preferred way to include additional configuration files.
+
+### Fixed
+- `files` option was buggy when only one file was given
+- Fix the python 3.12 warnings ([#30](https://github.com/vonshednob/pter/issues/30))
+
+
 ## 3.9.0
 ### Added
 - `files` option in `General` section. These files will be opened if you don't provide files on the commandline.
