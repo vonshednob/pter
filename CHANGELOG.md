@@ -5,6 +5,12 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.10.1
+### Fixed
+- `-u` would report that a new version is available if the version file contained a newline
+- Control characters in a task's description (e.g. `\x10`) could crash pter. They are now replaced with a space character during display and edit
+- Documentation wasn't very clear about how colors are prioritised/used when displaying items
+
 ## 3.10.0
 ### Changed
 - `[Include]` section in configuration file is now deprecated
