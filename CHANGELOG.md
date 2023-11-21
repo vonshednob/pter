@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.11.0
+### Fixed
+- pter would crash when you cancel saving a template
+- qpter would not start at all ([#31](https://github.com/vonshednob/pter/issues/31))
+
+### Added
+- `Y` calls the `to-clipboard` function that copies the selected task to your clipboard (in pter) ([#32](https://github.com/vonshednob/pter/issues/32))
+- ``Ctrl+C`` calls the ``to-clipboard`` function that copies the selected task to your clipboard (in qpter) ([#32](https://github.com/vonshednob/pter/issues/32))
+
 ## 3.10.1
 ### Fixed
 - `-u` would report that a new version is available if the version file contained a newline
