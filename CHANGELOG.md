@@ -5,6 +5,14 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.11.2
+### Fixed
+- Copy to clipboard actually copies to clipboard (not primary or secondary) in X11 now
+
+## 3.11.1
+### Added
+- Feedback to the user when copying tasks to clipboard
+
 ## 3.11.0
 ### Fixed
 - pter would crash when you cancel saving a template
