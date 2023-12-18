@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.11.3
+### Changed
+- Documentation split up in three different manpages, `pter(1)`, `qpter(1)`, `pter.config(5)`.
+
 ## 3.11.2
 ### Fixed
 - Copy to clipboard actually copies to clipboard (not primary or secondary) in X11 now
