@@ -5,6 +5,19 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.12.0
+### Added
+- Sorting by task creation date with `created`
+- `search-case-sensitive` can now be `yes`, `no`, or `smart` (assume case-insensitive, but switch to case-sensitive if you search with an uppercase character, [#15](https://codeberg.org/vonshednob/pter/issues/15))
+- New feature: auto templates. Apply a template when a new task contains trigger words ([#16](https://codeberg.org/vonshednob/pter/issues/16))
+
+### Fixed
+- `pter.config` man page is installed in the correct place
+
+## 3.11.4
+### Fixed
+- Installer script didn't actually install the man-pages
+
 ## 3.11.3
 ### Changed
 - Documentation split up in three different manpages, `pter(1)`, `qpter(1)`, `pter.config(5)`.
