@@ -2,7 +2,7 @@
 
 Your console and graphical UI to manage your todo.txt file(s).
 
-![A screenshot of pter in action](pter-demo.png)
+![A screenshot of pter in action](pter.png)
 
 There’s a presentation of pter in motion on [asciinema](https://asciinema.org/a/629376).
 
