@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.13.0
+### Added
+- `time-tracking` configuration option to integrate with external time tracking programs
+
 ## 3.12.0
 ### Added
 - Sorting by task creation date with `created`
