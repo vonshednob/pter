@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.14.0
+### Added
+- `sort-order` option (thanks a lot to onovy)
+- shortcut to set a task to priority `D` (thanks a lot to onovy)
+
+### Fixed
+- auto suggestions for `note:` did not list files from all folders
+
+
 ## 3.13.0
 ### Added
 - `time-tracking` configuration option to integrate with external time tracking programs
