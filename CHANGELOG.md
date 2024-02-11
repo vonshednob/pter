@@ -5,6 +5,15 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.15.0
+### Fixed
+- The `[Editor:Keys]` section in the configuration file was completely ignored ([#35](https://github.com/vonshednob/pter/issues/35))
+- It was not possible to (re-)bind the keys `:` or `=` to any function ([#33](https://github.com/vonshednob/pter/issues/33))
+
+### Added
+- You can tell pter to call external programs when certain things happen in the program. The term in the documentation is 'hooks'. ([#23](https://codeberg.org/vonshednob/pter/issues/23))
+
+
 ## 3.14.0
 ### Added
 - `sort-order` option (thanks a lot to onovy)
