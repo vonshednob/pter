@@ -93,3 +93,6 @@ requests/sending of patches!
 You can find the project at [codeberg](https://codeberg.org/vonshednob/pter)
 or just email any of the authors with your input.
 
+There is also a general XMPP discussion channel [pter](xmpp:pter@rooms.spacepanda.se?join)
+over at `spacepanda.se`.
+
