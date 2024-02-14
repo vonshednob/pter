@@ -5,6 +5,20 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.15.2
+### Fixed
+- Could not change list control key bindings ([#35](https://github.com/vonshednob/pter/issues/35))
+
+### Added
+- Support for `F13` through `F20` ([#39](https://github.com/vonshednob/pter/issues/39), thanks to andrei-a-papou!)
+
+
+## 3.15.1
+### Fixed
+- Scrolling was broken ([#37](https://github.com/vonshednob/pter/issues/37)), thanks to onovy for fixing it!
+- It wasn't possible to change the keybindings of text field editor keys ([#35](https://github.com/vonshednob/pter/issues/35))
+
+
 ## 3.15.0
 ### Fixed
 - The `[Editor:Keys]` section in the configuration file was completely ignored ([#35](https://github.com/vonshednob/pter/issues/35))

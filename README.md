@@ -2,13 +2,13 @@
 
 Your console and graphical UI to manage your todo.txt file(s).
 
-![A screenshot of pter in action](doc/pter.png)
+![A screenshot of pter in action](pter.png)
 
 There’s a presentation of pter in motion on [asciinema](https://asciinema.org/a/629376).
 
 Also in this package, the QT5 based graphical user interface, qpter.
 
-![A screenshot of qpter](doc/qpter.png)
+![A screenshot of qpter](qpter.png)
 
 pter has a bunch of features that help you managing your todo.txt file:
 
