@@ -5,6 +5,48 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.16.0
+### Changed
+- Welcome message shows the version, so you know what you're up against ([#40](https://github.com/vonshednob/pter/issues/40)), thanks andrei-a-papou!)
+- The dialog boxes to select things (context, project, link) attempt to not cut off their title
+- Searching for `due:` behaves the same way as `due:y`, `due:yes`, and `due:any`: any task with a due date is found
+- Searching for `hidden:1` will *only* show hidden tasks, use `hidden:any` to show all tasks including hidden ones
+- Searching for `hidden:` will find all tasks that have a `h:` attribute
+- Default time-out for the Esc-key is now 200 ms
+- Help bar at the bottom will show preferably the user-defined key bindings
+
+### Fixed
+- `#`, `[`, and `]` can also be used in key bindings, using `<hash>`, `<lbrack>`, and `<rbrack>` respectively ([#33](https://github.com/vonshednob/pter/issues/33))
+- Archiving and task deletion was broken and could crash pter ([#43](https://github.com/vonshednob/pter/issues/43))
+- Highlighting in dialog boxes to select things (context, project, link) is covering the whole line now (thanks, andrei-a-papou)
+- Sections in the help screen that would be empty because no keybindings have been defined, are no longer shown (thanks, andrei-a-papou)
+- Standalone `+` or `@` are no longer listed in their respective completions ([#46](https://github.com/vonshednob/pter/issues/46))
+- Mouse wheel scrolling would in some cases cause scrolling, making it look like there was any mouse support. Mouse wheel scrolling should now do nothing. ([#51](https://github.com/vonshednob/pter/issues/51))
+- Key sequences work in the help screen, too ([#59](https://github.com/vonshednob/pter/issues/59))
+- Scrolling with cursor keys in the help screen are no longer "lagging"
+- `quit` removed from the help screen; that means to close the help screen, use `cancel`
+
+### Added
+- `inc-due`, `dec-due` functions to increase/decrease due dates by `due-delta` (`1d` by default) or quickly add a due date if there is none, [#48](https://github.com/vonshednob/pter/issues/48)
+- `due-skip-weekend` option to skip over weekends when increasing/decreasing a due date
+- `clear-due` function to remove due date
+- `reduce-distraction` option to hide the task list when editing/creating tasks
+- `{{note}}` makes the `note:` attribute of a task available to hooks
+- Added `go-word-left`, `go-word-right`, `del-to-eol`, `del-word-left`, and `del-word-right` ([#36](https://github.com/vonshednob/pter/issues/36), thanks andrei-a-papou)
+- pter has the commandline parameter `--list-keys` (or short, `-k`) to list all key bindings
+- Added search term `due:any` to be more explicit about finding tasks that have any due date
+- Added search term `done:any` for consistency
+- Added search term `hidden:any`, to find all tasks, even hidden ones
+- Added search terms `t:any`, `t:yes`, and `t:no`
+- Configuration option `esc-timeout` in the `[General]` section
+- `view-note` command, by default on `V` to view a note instead of editing it
+- Configure the note viewer with the ``viewer`` option
+- `word-boundaries` option in `[General]` section for use with `go-word-` and `del-word-` functions
+- `help-action` option to configure the items in the help bar at the bottom of the screen
+- `{file}` field in `task-format`
+- `reset-terminal` configuration option ([#51](https://github.com/vonshednob/pter/issues/51), thanks, andrei-a-papou!)
+
+
 ## 3.15.2
 ### Fixed
 - Could not change list control key bindings ([#35](https://github.com/vonshednob/pter/issues/35))
