@@ -5,6 +5,13 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.16.1
+### Fixed
+- hooks were broken if a task contained a note ([#25](https://codeberg.org/vonshednob/pter/issues/25))
+
+### Changed
+- if no `notes` setting was set up in the configuration, the paths of the used todo.txt files are used as note folders
+
 ## 3.16.0
 ### Changed
 - Welcome message shows the version, so you know what you're up against ([#40](https://github.com/vonshednob/pter/issues/40)), thanks andrei-a-papou!)
