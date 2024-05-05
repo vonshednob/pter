@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.16.2
+### Fixed
+- Installation via `pipx` was broken when trying to use `qpter`
+
 ## 3.16.1
 ### Fixed
 - hooks were broken if a task contained a note ([#25](https://codeberg.org/vonshednob/pter/issues/25))

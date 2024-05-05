@@ -29,28 +29,55 @@ are missing.
 
 ## Installation
 
+### Install using pipx
+
+To install `pter` using `pipx`, run this:
+
+```sh
+    pipx install pter
+```
+
+If you wish to use `qpter`, the graphical version of `pter`, make sure you
+pass this option to `pipx`:
+
+```sh
+    pipx install pter[qt]
+```
+
+
 ### Install from PIP
+
+This is the deprecated way to install pter; instead rather use `pipx`; see
+above.
 
 To install pter you can either clone the repository (see at the end) or, much
 simpler, use pip to install it:
 
+```sh
     pip install pter
+```
 
 If you want to use the Qt GUI qpter, you have to install PyQt5::
 
+```sh
     pip install PyQt5
+```
 
 
 ## Using pter
 
 To launch pter you have to tell it where your todo.txt file is:
 
+```sh
     pter ~/todo.txt
+```
 
 For the graphical user interface (requires QT), you have to start it like
 this:
 
+```sh
     qpter ~/todo.txt
+```
 
 Both will give you a listing of all your tasks order by how soon they will be
 due and what priority you have given them.
@@ -81,7 +108,9 @@ There is a complex search available (have a look at the manual for details), but
 To launch the Qt GUI, you may (but don’t have to) provide the location of your
 todo.txt file::
 
+```sh
     qpter ~/todo.txt
+```
 
 
 # Contributing
