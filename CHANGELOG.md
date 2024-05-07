@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.16.3
+### Fixed
+- `qpter`'s smart search was broken ([#67](https://github.com/vonshednob/pter/issues/67))
+
 ## 3.16.2
 ### Fixed
 - Installation via `pipx` was broken when trying to use `qpter`
