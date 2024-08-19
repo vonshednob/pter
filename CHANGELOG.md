@@ -5,6 +5,10 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.17.1
+### Fixed
+- When guessing the location of notes, the path of the first todo files should be taken, not the file itself ([#68](https://github.com/vonshednob/pter/issues/68))
+
 ## 3.17.0
 ### Added
 - `done-is` and `done-file` configuration options to allow moving completed
