@@ -5,6 +5,16 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.18.0
+### Changed
+- Full switch over to `pyproject.toml`
+- Requires `pytodotxt` version 2.0.0
+
+### Added
+- Support for tasks with `t:` and `due:` with full ISO dates (e.g. `2024-06-21T15:10`; issue [#31](https://codeberg.org/vonshednob/pter/issues/31))
+- `duplicate-task` function, by default on `v` and not supported in qpter ([#30](https://codeberg.org/vonshednob/pter/issues/30))
+
+
 ## 3.17.1
 ### Fixed
 - When guessing the location of notes, the path of the first todo files should be taken, not the file itself ([#68](https://github.com/vonshednob/pter/issues/68))
