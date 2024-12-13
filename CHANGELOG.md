@@ -5,6 +5,19 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.19.0
+### Added
+- `note`, `projects`, `contexts`, `linenr`, and `spent` added as possible fields for `task-format` ([#69](https://github.com/vonshednob/pter/issues/69))
+- `completed_date` is a possible field for `sort:` and the `sort-order` configuration option ([#33](https://codeberg.org/vonshednob/pter/issues/33))
+- `due_in` and `duedays` mean the same thing and are both possible fields in `sort:` and the `sort-order` configuration option
+- `prio` and `priority` mean the same thing and are both possible fields in `sort:` and the `sort-order` configuration option
+- `archive-origin-marker` and `archive-origin-is` options to include the
+  origin todo.txt file of a task when archiving it ([#64](https://github.com/vonshednob/pter/issues/64))
+
+### Fixed
+- Install the man-pages ([#32](https://codeberg.org/vonshednob/pter/issues/32))
+
+
 ## 3.18.0
 ### Changed
 - Full switch over to `pyproject.toml`
