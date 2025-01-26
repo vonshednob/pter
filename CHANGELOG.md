@@ -5,6 +5,22 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.20.0
+### Added
+- Support for `-`/`+2b` as a relative date description to ensure the resulting date ends on a business day (thanks to [joeac](https://codeberg.org/joeac))
+- Introduced `business-days` configuration option ([#39](https://codeberg.org/vonshednob/pter/issues/39))
+
+
+## 3.19.2
+### Fixed
+- `qpter` would not start at all ([#37](https://codeberg.org/vonshednob/pter/issues/37))
+
+
+## 3.19.1
+### Changed
+- Drop the `enum.StrEnum` dependency to stay with Python 3.10 dependency ([#33](https://codeberg.org/vonshednob/pter/issues/33))
+
+
 ## 3.19.0
 ### Added
 - `note`, `projects`, `contexts`, `linenr`, and `spent` added as possible fields for `task-format` ([#69](https://github.com/vonshednob/pter/issues/69))
