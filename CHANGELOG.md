@@ -5,6 +5,11 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+## 3.20.1
+### Fixed
+- pter no longer crashes when colors are defined with only one value ([#44](https://codeberg.org/vonshednob/pter/issues/44), thanks simonz!)
+
+
 ## 3.20.0
 ### Added
 - Support for `-`/`+2b` as a relative date description to ensure the resulting date ends on a business day (thanks to [joeac](https://codeberg.org/joeac))
