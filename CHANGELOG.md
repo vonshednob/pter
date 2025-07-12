@@ -5,6 +5,14 @@ This file contains the changes made between released versions.
 The format is based on [Keep a changelog](https://keepachangelog.com/) and the versioning tries to follow
 [Semantic Versioning](https://semver.org).
 
+
+## 3.21.0
+### Added
+- You can define a separate color for displaying tasks that have been completed using the `completed` and `sel-completed` color names ([#71](https://github.com/vonshednob/pter/issues/71))
+
+### Fixed
+- when a `selection` symbol is provided in `Symbols`, it should be used in every list ([#71](https://github.com/vonshednob/pter/issues/71), thanks)
+
 ## 3.20.1
 ### Fixed
 - pter no longer crashes when colors are defined with only one value ([#44](https://codeberg.org/vonshednob/pter/issues/44), thanks simonz!)
