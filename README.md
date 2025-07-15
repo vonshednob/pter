@@ -34,14 +34,14 @@ are missing.
 To install `pter` using `pipx`, run this:
 
 ```sh
-    pipx install pter
+pipx install pter
 ```
 
 If you wish to use `qpter`, the graphical version of `pter`, make sure you
 pass this option to `pipx`:
 
 ```sh
-    pipx install pter[qt]
+pipx install pter[qt]
 ```
 
 
@@ -54,13 +54,13 @@ To install pter you can either clone the repository (see at the end) or, much
 simpler, use pip to install it:
 
 ```sh
-    pip install pter
+pip install pter
 ```
 
 If you want to use the Qt GUI qpter, you have to install PyQt5::
 
 ```sh
-    pip install PyQt5
+pip install PyQt5
 ```
 
 
@@ -69,14 +69,14 @@ If you want to use the Qt GUI qpter, you have to install PyQt5::
 To launch pter you have to tell it where your todo.txt file is:
 
 ```sh
-    pter ~/todo.txt
+pter ~/todo.txt
 ```
 
 For the graphical user interface (requires QT), you have to start it like
 this:
 
 ```sh
-    qpter ~/todo.txt
+qpter ~/todo.txt
 ```
 
 Both will give you a listing of all your tasks order by how soon they will be
@@ -109,7 +109,7 @@ To launch the Qt GUI, you may (but don’t have to) provide the location of your
 todo.txt file::
 
 ```sh
-    qpter ~/todo.txt
+qpter ~/todo.txt
 ```
 
 
@@ -119,7 +119,7 @@ Just like any other open source project, you’re invited to participate in
 pter’s development. Any contribution is welcome, from bug reports to pull
 requests/sending of patches!
 
-You can find the project at [codeberg](https://codeberg.org/vonshednob/pter)
+You can find the project at [codeberg](https://codeberg.org/pter/pter)
 or just email any of the authors with your input.
 
 There is also a general XMPP discussion channel [pter](xmpp:pter@rooms.spacepanda.se?join)
